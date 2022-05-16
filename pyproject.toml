@@ -1,0 +1,53 @@
+[tool.poetry]
+name = "onebot-cai"
+version = "0.1.0"
+description = "基于 CAI 的 OneBot Python 实现，部署简单，快捷"
+license = "AGPL-3.0-or-later"
+readme = "README.md"
+keywords = ["qq", "mirai", "cqhttp", "onebot"]
+classifiers = ["Framework :: Robot Framework", "Programming Language :: Python :: 3"]
+authors = ["MingxuanGame <MingxuanGame@outlook.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+fastapi = "^0.75.2"
+uvicorn = "^0.17.6"
+httpx = "^0.22.0"
+APScheduler = "^3.9.1"
+tomlkit = "^0.10.1"
+msgpack = "^1.0.3"
+pygtrie = "^2.4.2"
+aiofiles = "^0.8.0"
+plyvel-wheels = "^1.3.0"
+websockets = "^10.3"
+loguru = "^0.6.0"
+ffmpeg-python = "^0.2.0"
+pysilk-mod = "^1.5.0"
+cai = {git = "https://github.com/wyapx/CAI.git", rev = "dev"}
+
+
+[tool.poetry.dev-dependencies]
+flake8 = "^4.0.1"
+black = {version = "^22.3.0", allow-prereleases = true}
+pytest = "^7.1.2"
+pytest-asyncio = "^0.18.3"
+isort = "^5.10.1"
+
+[tool.black]
+line-length = 79
+target-version = ["py37", "py38", "py39", "py310"]
+include = '\.pyi?$'
+extend-exclude = '''
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 79
+length_sort = true
+skip_gitignore = true
+force_sort_within_sections = true
+extra_standard_library = ["typing_extensions"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
