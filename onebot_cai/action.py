@@ -10,12 +10,14 @@ from cai import Client
 from .run import get_client
 from .utils.database import database
 from .run import get_group_member_info_list
+from .run import get_status as cai_get_status
 from .msg.event_model import dataclass_to_dict
 from .run import get_group_info as cai_get_group_info
 from .connect.status import STATUS, OKInfo, FailedInfo
 from .msg.message import MessageSegment, get_base_element
-from .msg.models import File, FileID, SelfInfo, SentMessage
+from .const import IMPL, VERSION, PLATFORM, ONEBOT_VERSION
 from .run import get_group_member_info as cai_get_group_member_info
+from .msg.models import File, FileID, SelfInfo, SentMessage, VersionInfo
 from .run import send_group_msg, get_group_info_list, get_friend_info_list
 
 
@@ -243,3 +245,24 @@ async def upload_file(echo: str, **kwargs):
         return FailedInfo(
             retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
+
+
+async def get_status(client: Client, echo: str, **kwargs):
+    """
+    获取运行状态
+    https://12.onebot.dev/interface/meta/actions/#get_status
+    """
+    return OKInfo(data=cai_get_status(client), echo=echo)
+
+
+async def get_version(echo: str, **kwargs):
+    """获取版本信息"""
+    return OKInfo(
+        data=VersionInfo(
+            impl=IMPL,
+            platform=PLATFORM,
+            version=VERSION,
+            onebot_version=ONEBOT_VERSION,
+        ),
+        echo=echo,
+    )

@@ -1,4 +1,7 @@
 """OneBot CAI 通用运行模块"""
+
+import contextlib
+from re import L
 from typing import List, Callable, Optional
 
 from cai.api.client import Client
@@ -16,8 +19,8 @@ from .login import login
 from .config import config
 from .const import Protocol
 from .utils.database import database
-from .connect.status import STATUS, FailedInfo, SuccessRequest
-from .msg.models import GroupInfo, FriendInfo, GroupMemberInfo
+from .connect.status import STATUS, OKInfo, FailedInfo, SuccessRequest
+from .msg.models import GroupInfo, FriendInfo, StatusInfo, GroupMemberInfo
 
 client: Optional[Client] = None
 
@@ -37,6 +40,15 @@ async def init(account: int, password: str, push_event: Callable):
         client.add_event_listener(push_event)
     else:
         await close(None, True)
+
+
+def get_status(_client: Client) -> StatusInfo:
+    """获取运行状态"""
+    if status := _client.status:
+        status = status != OnlineStatus.Offline
+    else:
+        status = False
+    return StatusInfo(good=status, online=status)
 
 
 async def get_user_info(
@@ -151,6 +163,33 @@ async def send_group_msg(
         raise
 
 
+def get_supported_actions(echo: str):
+    """
+    获取支持的动作列表
+    https://12.onebot.dev/interface/meta/actions/#get_supported_actions
+    """
+    import onebot_cai.action as action_module
+
+    actions = ["get_supported_actions"]
+    for name in dir(action_module):
+        if (
+            "__" not in name  # 排除魔法方法
+            and name != "get_latest_events"  # 排除获取最新事件列表
+            and name.lower() == name  # 排除类
+            and (func := getattr(action_module, name))
+            and callable(func)  # 排除不可调用对象
+        ):
+            with contextlib.suppress(AttributeError):
+                if "echo" in func.__annotations__:  # 是否为动作
+                    if "qq_" in name:  # 扩展动作
+                        name = name.replace("qq_", "qq.")
+                    actions.append(name)
+    return OKInfo(
+        data=actions,
+        echo=echo,
+    )
+
+
 async def run_action(action: str, **kwargs) -> SuccessRequest:
     """执行动作"""
     import onebot_cai.action as action_module
@@ -158,6 +197,8 @@ async def run_action(action: str, **kwargs) -> SuccessRequest:
     echo = kwargs.pop("echo", "")
     try:
         action = action.replace(".", "_")
+        if action == "get_supported_actions":
+            return get_supported_actions(echo)
         func = getattr(action_module, action)
         if action == "run_action" or not callable(func):
             return FailedInfo(

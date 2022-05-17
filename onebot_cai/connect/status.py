@@ -38,7 +38,7 @@ class SuccessRequest(BaseModel):
 
     status: str
     retcode: int
-    data: Union[dict, List[BaseModel], BaseModel, None]
+    data: Union[dict, List[BaseModel], List[str], BaseModel, None]
     echo: Optional[str] = None
     message: str
 

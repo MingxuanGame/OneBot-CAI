@@ -71,3 +71,19 @@ class File(BaseModel):
     path: Optional[Union[Path, str]] = None
     data: Optional[bytes] = None
     sha256: Optional[str] = None
+
+
+class StatusInfo(BaseModel):
+    """运行状态信息"""
+
+    good: bool
+    online: bool
+
+
+class VersionInfo(BaseModel):
+    """版本信息"""
+
+    impl: str
+    platform: str
+    version: str
+    onebot_version: str
