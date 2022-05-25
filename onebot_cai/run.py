@@ -173,14 +173,16 @@ async def send_group_msg(
     try:
         element = await get_base_element(msg)
         seq, rand, timestamp = await _client.send_group_msg(group_id, element)
-        database.save_message(DatabaseMessage(
-            msg=msg,
-            seq=seq,
-            rand=rand,
-            time=timestamp,
-            group=group_id,
-            user=_client.session.uin
-        ))
+        database.save_message(
+            DatabaseMessage(
+                msg=msg,
+                seq=seq,
+                rand=rand,
+                time=timestamp,
+                group=group_id,
+                user=_client.session.uin,
+            )
+        )
         return seq, rand, timestamp
     except BotMutedException:
         return 1
@@ -236,8 +238,17 @@ async def run_action(action: str, **kwargs) -> SuccessRequest:
         need_params = func.__annotations__.keys()
         if len(need_params) == 1 or "client" not in need_params:
             return await func(echo, **kwargs)
-        else:
-            return await func(get_client(), echo, **kwargs)
+        client = get_client()
+        return (
+            await func(client, echo, **kwargs)
+            if client
+            else FailedInfo(
+                retcode=34099,
+                echo=echo,
+                message=STATUS[34099],
+                data=None,
+            )
+        )
     except Exception as e:
         logger.exception("执行动作时出现未知错误")
         return FailedInfo(
