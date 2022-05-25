@@ -7,16 +7,17 @@ from binascii import Error as B64Error
 
 from cai import Client
 
+from .log import logger
 from .run import get_client
 from .utils.database import database
 from .run import get_group_member_info_list
 from .run import get_status as cai_get_status
 from .run import get_group_info as cai_get_group_info
 from .connect.status import STATUS, OKInfo, FailedInfo
-from .msg.message import MessageSegment, DatabaseMessage
 from .const import IMPL, VERSION, PLATFORM, ONEBOT_VERSION
 from .run import get_group_member_info as cai_get_group_member_info
 from .msg.models import File, FileID, SelfInfo, SentMessage, VersionInfo
+from .msg.message import MessageSegment, DatabaseMessage, get_alt_message
 from .run import (
     send_group_msg,
     delete_group_msg,
@@ -170,19 +171,24 @@ async def send_message(client: Client, echo: str, **kwargs):
                 group=group_id,
             )
         )
+        alt_message = await get_alt_message(message, group_id=group_id)
+        logger.info(f"向群 {group_id} 发送消息：{alt_message}")
         return OKInfo(
             data=SentMessage(time=int(time()), message_id=message_id),
             echo=echo,
         )
     elif result == 2:
+        logger.warning("群消息发送失败：@全体成员 次数达到限制")
         return FailedInfo(
             retcode=34003, message=STATUS[34003], data=None, echo=echo
         )
     elif result == 3:
+        logger.warning("群消息发送失败：每分钟消息数限制")
         return FailedInfo(
             retcode=34002, message=STATUS[34002], data=None, echo=echo
         )
     else:
+        logger.warning("群消息发送失败：账号可能被禁言或风控")
         return FailedInfo(
             retcode=34000, message=STATUS[34000], data=None, echo=echo
         )
