@@ -11,14 +11,18 @@ from .run import get_client
 from .utils.database import database
 from .run import get_group_member_info_list
 from .run import get_status as cai_get_status
-from .msg.event_model import dataclass_to_dict
 from .run import get_group_info as cai_get_group_info
 from .connect.status import STATUS, OKInfo, FailedInfo
-from .msg.message import MessageSegment, get_base_element
+from .msg.message import MessageSegment, DatabaseMessage
 from .const import IMPL, VERSION, PLATFORM, ONEBOT_VERSION
 from .run import get_group_member_info as cai_get_group_member_info
 from .msg.models import File, FileID, SelfInfo, SentMessage, VersionInfo
-from .run import send_group_msg, get_group_info_list, get_friend_info_list
+from .run import (
+    send_group_msg,
+    delete_group_msg,
+    get_group_info_list,
+    get_friend_info_list,
+)
 
 
 async def get_self_info(echo: str):
@@ -154,12 +158,18 @@ async def send_message(client: Client, echo: str, **kwargs):
         return FailedInfo(
             retcode=10004, echo=echo, message=STATUS[10004], data=None
         )
-    elements = await get_base_element(
-        [MessageSegment.parse_obj(j) for j in message]
-    )
-    result = await send_group_msg(client, group_id, elements)
-    if result == 0:
-        message_id = database.save_message(message)
+    message = [MessageSegment.parse_obj(i) for i in message]
+    result = await send_group_msg(client, group_id, message)
+    if isinstance(result, tuple):
+        message_id = database.save_message(
+            DatabaseMessage(
+                msg=message,
+                seq=result[0],
+                rand=result[1],
+                time=result[2],
+                group=group_id,
+            )
+        )
         return OKInfo(
             data=SentMessage(time=int(time()), message_id=message_id),
             echo=echo,
@@ -178,6 +188,52 @@ async def send_message(client: Client, echo: str, **kwargs):
         )
 
 
+async def delete_message(client: Client, echo: str, **kwargs):
+    # sourcery skip: merge-nested-ifs
+    """
+    撤回消息
+    https://12.onebot.dev/interface/message/actions/#delete_message
+    """
+    try:
+        msg_id = kwargs.get("message_id", None)
+        msg = database.get_message(msg_id)
+        if msg:
+            if msg.group and msg.seq and msg.rand:
+                result = await delete_group_msg(
+                    client,
+                    msg.group,
+                    msg.seq,
+                    msg.rand,
+                    msg.time,
+                )
+                if result:
+                    return OKInfo(echo=echo, data=None)
+                if isinstance(result, Exception):
+                    return FailedInfo(
+                        retcode=34004,
+                        data=None,
+                        message=STATUS[34004],
+                        echo=echo,
+                    )
+                else:
+                    return FailedInfo(
+                        retcode=34999,
+                        data=None,
+                        message=STATUS[34999],
+                        echo=echo,
+                    )
+        return FailedInfo(
+            retcode=31000,
+            data=None,
+            message=STATUS[31000],
+            echo=echo,
+        )
+    except ValueError:
+        return FailedInfo(
+            retcode=10004, echo=echo, message=STATUS[10004], data=None
+        )
+
+
 async def qq_get_message(echo: str, **kwargs):
     """
     扩展动作：获取消息
@@ -189,9 +245,8 @@ async def qq_get_message(echo: str, **kwargs):
         return FailedInfo(
             retcode=10004, echo=echo, message=STATUS[10004], data=None
         )
-    if event := database.get_event(message_id):
-        data_dict = dataclass_to_dict(event)
-        return OKInfo(data=data_dict, echo=echo)
+    if message := database.get_message(message_id):
+        return OKInfo(data=message, echo=echo)
     else:
         return FailedInfo(
             retcode=10004, echo=echo, message=STATUS[10004], data=None

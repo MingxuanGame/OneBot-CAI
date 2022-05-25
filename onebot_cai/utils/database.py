@@ -10,7 +10,7 @@ from msgpack import packb, unpackb
 
 from ..msg import event_model
 from ..msg.models import File
-from ..msg.message import Message, MessageSegment
+from ..msg.message import MessageSegment, DatabaseMessage
 from ..msg.event_model import BaseEvent, dataclass_to_dict, dict_to_dataclass
 
 # 注册 event 树
@@ -96,33 +96,37 @@ class Database:
         except Exception as e:
             print("Event Parser Error", e)
 
-    def save_message(self, message: Message) -> Optional[str]:
+    def save_message(self, message: DatabaseMessage) -> Optional[str]:
         """
         保存消息
 
         message 消息对象
         """
-        if message:
-            id_ = str(uuid4().int)[:10]
-            message_dict = [
-                msg.dict() if isinstance(msg, MessageSegment) else msg
-                for msg in message
-            ]
-            return self._pack_data(message_dict, id_)
+        id_ = str(uuid4().int)[:10]
+        return self._pack_data(message.dict(), id_)
 
     def _pack_data(self, arg0, id_):
         event_byte = packb(arg0, use_bin_type=True)
         self.db.put(str(id_).encode(), event_byte)
         return id_
 
-    def get_message(self, _id: str) -> Optional[Message]:
+    def get_message(self, _id: str) -> Optional[DatabaseMessage]:
         """
         获取消息
 
         _id 消息 ID
         """
         if message := self.db.get(_id.encode()):
-            return [MessageSegment.parse_obj(msg) for msg in message]
+            message = unpackb(message, raw=False)
+            segments = [MessageSegment.parse_obj(msg) for msg in message["msg"]]
+            return DatabaseMessage(
+                msg=segments,
+                seq=message["seq"],
+                rand=message["rand"],
+                time=message["time"],
+                group=message["group"],
+                user=message["user"],
+            )
 
     def close(self):
         """关闭数据库"""

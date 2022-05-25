@@ -20,8 +20,10 @@ STATUS = {
     34000: "Can't Send Message",  # 由于风控等未知原因无法发送消息
     34001: "Bot was muted",  # 机器人被禁言
     34002: "Group has message limits",  # 群消息数量限制
-    34099: "No Login",  # 未登录
     34003: "No mention times",  # @全部成员限制
+    34004: "Permission Denied",  # 权限不足
+    34099: "No Login",  # 未登录
+    34999: "Unknown Error",  # 未知错误
     35000: "Can't Find User",  # 找不到用户
     35001: "Can't Find Group",  # 找不到群
     36000: "Need Dependents to Update",  # 等待上游依赖更新（有更新回来踢我一脚）

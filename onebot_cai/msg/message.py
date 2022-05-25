@@ -18,9 +18,8 @@ from cai.client.message_service.models import (
     VoiceElement,
 )
 
-from onebot_cai.connect.exception import HTTPClientError
-
 from .models import File
+from ..connect.exception import HTTPClientError
 from ..utils.media import video_to_mp4, audio_to_silk
 
 POKE_NAME = {0: "戳一戳", 2: "比心", 3: "点赞", 4: "心碎", 5: "666", 6: "放大招"}
@@ -34,6 +33,15 @@ class MessageSegment(BaseModel):
 
 
 Message = List[MessageSegment]
+
+
+class DatabaseMessage(BaseModel):
+    msg: Message
+    seq: Optional[int] = None
+    rand: Optional[int] = None
+    time: Optional[int] = None
+    group: Optional[int] = None
+    user: Optional[int] = None
 
 
 def get_message_element(
@@ -114,22 +122,23 @@ async def get_base_element(
     for i in message:
         type_ = i.type
         if not ignore_reply and type_ == "reply":
-            if (data := i.data) and (seq := data.get("message_id")):
-                event = database.get_event(seq)
-                from .event_model import BaseMessageEvent
-
-                if isinstance(event, BaseMessageEvent):
-                    message_ = await get_base_element(event.message, True)
-                    user_id = event.user_id
-                    messages.append(
-                        ReplyElement(
-                            seq=int(seq),
-                            time=int(event.time),
-                            sender=user_id,
-                            message=message_,
-                            troop_name=None,
-                        )
+            if (
+                (data := i.data)
+                and (seq := data.get("message_id"))
+                and (msg := database.get_message(seq))
+                and (user_id := msg.user)
+                and (timestamp := msg.time)
+            ):
+                message_ = await get_base_element(msg.msg, True)
+                messages.append(
+                    ReplyElement(
+                        seq=int(seq),
+                        time=timestamp,
+                        sender=user_id,
+                        message=message_,
+                        troop_name=None,
                     )
+                )
         if type_ == "text":
             if (data := i.data) and (text := data.get("text")):
                 messages.append(TextElement(content=text))

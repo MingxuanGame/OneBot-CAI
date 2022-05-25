@@ -73,6 +73,7 @@ async def cai_event_to_dataclass(
                 message=message,
                 alt_message=alt_message,
                 __seq__=seq,
+                __rand__=event.rand,
             )
     elif isinstance(event, GroupMemberMutedEvent):
         logger.debug("将 CAI GroupMemberMutedEvent 转换为 GroupMemberBanEvent")
@@ -109,24 +110,25 @@ async def cai_event_to_dataclass(
         onebot_event.sub_type = ""
         return onebot_event
     elif isinstance(event, GroupMessageRecalledEvent):
-        seq = event.msg_seq
-        logger.debug(
-            "将 CAI GroupMessageRecalledEvent 转换为 "
-            f"GroupMessageDelete（seq：{seq}）"
-        )
-        onebot_event = GroupMessageDeleteEvent(
-            time=time(),
-            id=str(uuid4()),
-            self_id=bot_id,
-            group_id=event.group_id,
-            user_id=event.author_id,
-            operator_id=0,
-            message_id=str(seq),
-        )
-        onebot_event.sub_type = (
-            "recall" if event.author_id == event.operator_id else "delete"
-        )
-        return onebot_event
+        if event.author_id != bot_id:
+            seq = event.msg_seq
+            logger.debug(
+                "将 CAI GroupMessageRecalledEvent 转换为 "
+                f"GroupMessageDelete（seq：{seq}）"
+            )
+            onebot_event = GroupMessageDeleteEvent(
+                time=time(),
+                id=str(uuid4()),
+                self_id=bot_id,
+                group_id=event.group_id,
+                user_id=event.author_id,
+                operator_id=0,
+                message_id=str(seq),
+            )
+            onebot_event.sub_type = (
+                "recall" if event.author_id == event.operator_id else "delete"
+            )
+            return onebot_event
     elif isinstance(event, BaseGroupMemberSpecialTitleChangedEvent):
         logger.debug(
             "将 CAI GroupMemberSpecialTitleChangedEvent 转换为 "

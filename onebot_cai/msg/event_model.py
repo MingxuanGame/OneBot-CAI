@@ -330,6 +330,7 @@ class GroupMessageEvent(BaseMessageEvent):
     """
 
     __event__ = "message.group"
+    __rand__: int
     group_id: int
 
     @property

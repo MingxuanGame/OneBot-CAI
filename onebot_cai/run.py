@@ -1,14 +1,13 @@
 """OneBot CAI 通用运行模块"""
-
 import contextlib
-from re import L
-from typing import List, Callable, Optional
+from time import time
+from typing import List, Tuple, Union, Callable, Optional
 
 from cai.api.client import Client
 from cai.client.status_service import OnlineStatus
-from cai.client.message_service.models import Element
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from cai.api.error import (
+    BotException,
     BotMutedException,
     AtAllLimitException,
     GroupMsgLimitException,
@@ -19,6 +18,7 @@ from .login import login
 from .config import config
 from .const import Protocol
 from .utils.database import database
+from .msg.message import Message, DatabaseMessage, get_base_element
 from .connect.status import STATUS, OKInfo, FailedInfo, SuccessRequest
 from .msg.models import GroupInfo, FriendInfo, StatusInfo, GroupMemberInfo
 
@@ -146,13 +146,42 @@ async def get_friend_info_list(no_cache: bool = True) -> List[FriendInfo]:
     return []
 
 
+async def delete_group_msg(
+    _client: Client,
+    group_id: int,
+    seq: int,
+    rand: int,
+    timestamp: Optional[int] = None,
+) -> Union[bool, Exception]:
+    """撤回群消息"""
+    if not timestamp:
+        timestamp = int(time())
+    try:
+        await _client.recall_group_msg(
+            group_id,
+            (seq, rand, timestamp),
+        )
+        return True
+    except BotException as e:
+        return e
+
+
 async def send_group_msg(
-    _client: Client, group_id: int, msg: List[Element]
-) -> int:
+    _client: Client, group_id: int, msg: Message
+) -> Union[int, Tuple[int, int, int]]:
     """发送群消息"""
     try:
-        await _client.send_group_msg(group_id, msg)
-        return 0
+        element = await get_base_element(msg)
+        seq, rand, timestamp = await _client.send_group_msg(group_id, element)
+        database.save_message(DatabaseMessage(
+            msg=msg,
+            seq=seq,
+            rand=rand,
+            time=timestamp,
+            group=group_id,
+            user=_client.session.uin
+        ))
+        return seq, rand, timestamp
     except BotMutedException:
         return 1
     except AtAllLimitException:
@@ -199,18 +228,16 @@ async def run_action(action: str, **kwargs) -> SuccessRequest:
         action = action.replace(".", "_")
         if action == "get_supported_actions":
             return get_supported_actions(echo)
-        func = getattr(action_module, action)
+        func = getattr(action_module, action, None)
         if action == "run_action" or not callable(func):
             return FailedInfo(
                 retcode=10002, echo=echo, message=STATUS[10002], data=None
             )
         need_params = func.__annotations__.keys()
-        if len(need_params) == 1:
-            return await func(echo)
-        elif "client" in need_params:
-            return await func(get_client(), echo, **kwargs)
-        else:
+        if len(need_params) == 1 or "client" not in need_params:
             return await func(echo, **kwargs)
+        else:
+            return await func(get_client(), echo, **kwargs)
     except Exception as e:
         logger.exception("执行动作时出现未知错误")
         return FailedInfo(

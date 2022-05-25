@@ -13,12 +13,15 @@ from ..run import close
 from ..log import logger
 from ..config import config
 from ..utils.database import database
+from ..msg.message import DatabaseMessage
 from .utils import init, run_action_by_dict
 from ..msg.event import cai_event_to_dataclass
 from ..msg.event_model import (
     BaseEvent,
     HeartbeatEvent,
     BaseMessageEvent,
+    GroupMessageEvent,
+    PrivateMessageEvent,
     dataclass_to_dict,
 )
 
@@ -97,7 +100,7 @@ async def root(websocket: WebSocket):
         while True:
             data = await websocket.receive_json()
             resp = await run_action_by_dict(data)
-            await websocket.send_json(resp)
+            await websocket.send_json(resp.dict())
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
@@ -107,8 +110,26 @@ async def push_event(client: Client, event: Event):
     bot_id = client.session.uin
     if data := await cai_event_to_dataclass(bot_id, event):
         if isinstance(data, BaseMessageEvent):
-            id_ = database.save_event(data)
-            setattr(data, "message_id", id_)
+            save_msg = None
+            if isinstance(data, GroupMessageEvent):
+                save_msg = DatabaseMessage(
+                    msg=data.message,
+                    time=int(data.time),
+                    seq=data.__seq__,
+                    group=data.group_id,
+                    rand=data.__rand__,
+                    user=data.user_id,
+                )
+            elif isinstance(data, PrivateMessageEvent):
+                save_msg = DatabaseMessage(
+                    msg=data.message,
+                    time=int(data.time),
+                    seq=data.__seq__,
+                    user=data.user_id,
+                )
+            if save_msg:
+                id_ = database.save_message(save_msg)
+                setattr(data, "message_id", id_)
         await manager.broadcast(data)
 
 
