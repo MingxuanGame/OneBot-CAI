@@ -154,7 +154,6 @@ class WebSocketClient:
                         seq=data.__seq__,
                         group=data.group_id,
                         rand=data.__rand__,
-                        user=data.user_id,
                     )
                 elif isinstance(data, PrivateMessageEvent):
                     save_msg = DatabaseMessage(
