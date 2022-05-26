@@ -10,21 +10,24 @@ from cai import Client
 from .log import logger
 from .run import get_client
 from .run import mute_member
+from .run import delete_group_msg
 from .utils.database import database
 from .run import get_group_member_info_list
 from .run import set_admin as cai_set_admin
 from .run import get_status as cai_get_status
 from .run import get_group_info as cai_get_group_info
+from .run import send_group_msg as cai_send_group_msg
+from .run import send_private_msg as cai_send_private_msg
 from .const import IMPL, VERSION, PLATFORM, ONEBOT_VERSION
 from .run import get_group_member_info as cai_get_group_member_info
 from .connect.status import STATUS, OKInfo, FailedInfo, SuccessRequest
 from .msg.models import File, FileID, SelfInfo, SentMessage, VersionInfo
-from .msg.message import MessageSegment, DatabaseMessage, get_alt_message
-from .run import (
-    send_group_msg,
-    delete_group_msg,
-    get_group_info_list,
-    get_friend_info_list,
+from .run import delete_private_msg, get_group_info_list, get_friend_info_list
+from .msg.message import (
+    Message,
+    MessageSegment,
+    DatabaseMessage,
+    get_alt_message,
 )
 
 
@@ -148,21 +151,11 @@ async def get_group_member_list(echo: str, **kwargs):
     return OKInfo(data=members, echo=echo)  # type: ignore
 
 
-async def send_message(client: Client, echo: str, **kwargs):
-    """
-    发送消息
-    https://12.onebot.dev/interface/message/actions/#send_message
-
-    注意：目前仅支持发送消息，发送私聊消息会报错
-    """
-    group_id = int(kwargs.get("group_id", None))
-    message: list = kwargs.get("message", None)
-    if not group_id or not message:
-        return FailedInfo(
-            retcode=10004, echo=echo, message=STATUS[10004], data=None
-        )
-    message = [MessageSegment.parse_obj(i) for i in message]
-    result = await send_group_msg(client, group_id, message)
+async def send_group_msg(
+    client: Client, echo: str, group_id: int, message: Message
+):
+    """发送群消息"""
+    result = await cai_send_group_msg(client, group_id, message)
     if isinstance(result, tuple):
         message_id = database.save_message(
             DatabaseMessage(
@@ -196,6 +189,56 @@ async def send_message(client: Client, echo: str, **kwargs):
         )
 
 
+async def send_private_msg(
+    client: Client, echo: str, user_id: int, message: Message
+):
+    result = await cai_send_private_msg(client, user_id, message)
+    if isinstance(result, tuple):
+        message_id = database.save_message(
+            DatabaseMessage(
+                msg=message,
+                seq=result[0],
+                rand=result[1],
+                time=result[2],
+                user=client.session.uin,
+            )
+        )
+        alt_message = await get_alt_message(message)
+        logger.info(f"向好友 {user_id} 发送消息：{alt_message}")
+        return OKInfo(
+            data=SentMessage(time=int(time()), message_id=message_id),
+            echo=echo,
+        )
+    else:
+        logger.warning("群消息发送失败：账号可能被禁言或风控")
+        return FailedInfo(
+            retcode=34000, message=STATUS[34000], data=None, echo=echo
+        )
+
+
+async def send_message(client: Client, echo: str, **kwargs):
+    """
+    发送消息
+    https://12.onebot.dev/interface/message/actions/#send_message
+    """
+    message: list = kwargs.get("message", None)
+    detail_type = kwargs.get("detail_type", None)
+    if not detail_type or not message:
+        return FailedInfo(
+            retcode=10004, echo=echo, message=STATUS[10004], data=None
+        )
+    message = [MessageSegment.parse_obj(i) for i in message]
+    if detail_type == "group":
+        if group_id := kwargs.get("group_id", None):
+            return await send_group_msg(client, echo, group_id, message)
+    elif detail_type == "private":
+        if user_id := kwargs.get("user_id", None):
+            return await send_private_msg(client, echo, user_id, message)
+    return FailedInfo(
+        retcode=10004, echo=echo, message=STATUS[10004], data=None
+    )
+
+
 async def delete_message(client: Client, echo: str, **kwargs):
     # sourcery skip: merge-nested-ifs
     """
@@ -207,35 +250,37 @@ async def delete_message(client: Client, echo: str, **kwargs):
         msg = database.get_message(msg_id)
         if msg:
             if msg.group and msg.seq and msg.rand:
-                result = await delete_group_msg(
+                func = delete_group_msg(
                     client,
                     msg.group,
                     msg.seq,
                     msg.rand,
                     msg.time,
                 )
-                if result:
-                    return OKInfo(echo=echo, data=None)
-                if isinstance(result, Exception):
-                    return FailedInfo(
-                        retcode=34004,
-                        data=None,
-                        message=STATUS[34004],
-                        echo=echo,
-                    )
-                else:
-                    return FailedInfo(
-                        retcode=34999,
-                        data=None,
-                        message=STATUS[34999],
-                        echo=echo,
-                    )
-        return FailedInfo(
-            retcode=31000,
-            data=None,
-            message=STATUS[31000],
-            echo=echo,
-        )
+            elif msg.user and msg.seq and msg.time:
+                func = delete_private_msg(
+                    client,
+                    msg.user,
+                    msg.seq,
+                    msg.time,
+                    msg.rand,
+                )
+            else:
+                return FailedInfo(
+                    retcode=31000,
+                    data=None,
+                    message=STATUS[31000],
+                    echo=echo,
+                )
+            result = await func
+            if not isinstance(result, Exception):
+                return OKInfo(echo=echo, data=None)
+            return FailedInfo(
+                retcode=34004,
+                data=None,
+                message=STATUS[34004],
+                echo=echo,
+            )
     except ValueError:
         return FailedInfo(
             retcode=10004, echo=echo, message=STATUS[10004], data=None

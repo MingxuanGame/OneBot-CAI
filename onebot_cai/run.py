@@ -1,6 +1,7 @@
 """OneBot CAI 通用运行模块"""
 import contextlib
 from time import time
+from random import randint
 from typing import List, Tuple, Union, Callable, Optional
 
 from cai.api.client import Client
@@ -146,6 +147,34 @@ async def get_friend_info_list(no_cache: bool = True) -> List[FriendInfo]:
     return []
 
 
+async def delete_msg(
+    _client: Client,
+    id_: int,
+    seq: int,
+    rand: Optional[int] = None,
+    timestamp: Optional[int] = None,
+    is_private: Optional[bool] = False,
+) -> Union[bool, Exception]:
+    """撤回消息"""
+    if not timestamp:
+        timestamp = int(time())
+    if not rand:
+        rand = randint(1000, 1000000)
+    try:
+        func = (
+            _client.recall_friend_msg
+            if is_private
+            else _client.recall_group_msg
+        )
+        await func(
+            id_,
+            (seq, rand, timestamp),
+        )
+        return True
+    except BotException as e:
+        return e
+
+
 async def delete_group_msg(
     _client: Client,
     group_id: int,
@@ -154,16 +183,7 @@ async def delete_group_msg(
     timestamp: Optional[int] = None,
 ) -> Union[bool, Exception]:
     """撤回群消息"""
-    if not timestamp:
-        timestamp = int(time())
-    try:
-        await _client.recall_group_msg(
-            group_id,
-            (seq, rand, timestamp),
-        )
-        return True
-    except BotException as e:
-        return e
+    return await delete_msg(_client, group_id, seq, rand, timestamp, False)
 
 
 async def send_group_msg(
@@ -180,7 +200,6 @@ async def send_group_msg(
                 rand=rand,
                 time=timestamp,
                 group=group_id,
-                user=_client.session.uin,
             )
         )
         return seq, rand, timestamp
@@ -190,6 +209,41 @@ async def send_group_msg(
         return 2
     except GroupMsgLimitException:
         return 3
+    except Exception:
+        raise
+
+
+# TODO: need dependent
+async def delete_private_msg(
+    _client: Client,
+    user_id: int,
+    seq: int,
+    timestamp: int,
+    rand: Optional[int] = None,
+) -> Union[bool, Exception]:
+    """撤回好友消息"""
+    return await delete_msg(_client, user_id, seq, rand, timestamp, True)
+
+
+async def send_private_msg(
+    _client: Client, user_id: int, msg: Message
+) -> Union[int, Tuple[int, int, int]]:
+    """发送好友消息"""
+    try:
+        element = await get_base_element(msg)
+        seq, rand, timestamp = await _client.send_friend_msg(user_id, element)
+        database.save_message(
+            DatabaseMessage(
+                msg=msg,
+                seq=seq,
+                rand=rand,
+                time=timestamp,
+                user=_client.session.uin,
+            )
+        )
+        return seq, rand, timestamp
+    except BotException:
+        return 0
     except Exception:
         raise
 
