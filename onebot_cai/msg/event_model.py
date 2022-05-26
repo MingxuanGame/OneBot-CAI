@@ -309,6 +309,23 @@ class GroupMemberBanEvent(BaseNoticeEvent):
 
 
 @dataclass
+class GroupNudgeEvent(BaseNoticeEvent):
+    """
+    扩展事件：戳一戳（双击头像）
+    """
+
+    __event__ = "notice.qq.group_nudge"
+    group_id: int
+    user_id: int
+    target_id: int
+    text: str
+
+    @property
+    def detail_type(self) -> str:
+        return "qq.group_nudge"
+
+
+@dataclass
 class PrivateMessageEvent(BaseMessageEvent):
     """
     私聊消息事件

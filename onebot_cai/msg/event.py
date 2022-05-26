@@ -5,6 +5,7 @@ from typing import Union
 
 from cai.client.events.base import Event as CAIEvent
 from cai.client.events.common import BotOnlineEvent, BotOfflineEvent
+from cai.client.events.group import GroupNudgeEvent as BaseGroupNudgeEvent
 from cai.client.message_service.models import GroupMessage as BaseGroupMessage
 from cai.client.message_service.models import (
     PrivateMessage as BasePrivateMessage,
@@ -23,6 +24,7 @@ from ..log import logger
 from .message import get_alt_message, get_message_element
 from .event_model import (
     BaseEvent,
+    GroupNudgeEvent,
     GroupMessageEvent,
     GroupMemberBanEvent,
     PrivateMessageEvent,
@@ -177,5 +179,21 @@ async def cai_event_to_dataclass(
         if event.reconnect:
             info += "，即将重连"
         logger.info(info)
+    elif isinstance(event, BaseGroupNudgeEvent):
+        logger.debug("将 CAI GroupNudgeEvent 转换为 GroupNudgeEvent")
+        user_id = event.sender_id
+        target_id = event.receiver_id
+        group_id = event.group_id
+        text = event.action_text
+        logger.info(f"群 {group_id} 成员 {user_id} {text} {target_id}")
+        return GroupNudgeEvent(
+            time=time(),
+            id=str(uuid4()),
+            self_id=bot_id,
+            user_id=user_id,
+            target_id=target_id,
+            group_id=group_id,
+            text=text,
+        )
     else:
         logger.debug(f"未转换 CAI {event.__class__.__name__} 事件")
