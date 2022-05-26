@@ -259,6 +259,20 @@ async def run_action(action: str, **kwargs) -> SuccessRequest:
         )
 
 
+async def mute_member(
+    _client: Client, group_id: int, user_id: int, duration: int
+):
+    """禁言群成员"""
+    await _client.mute_member(group_id, user_id, duration)
+
+
+async def set_admin(
+    _client: Client, group_id: int, user_id: int, is_admin: bool
+):
+    """设置群管理"""
+    await _client.set_group_admin(group_id, user_id, is_admin)
+
+
 async def close(scheduler: Optional[AsyncIOScheduler], is_fatal: bool = False):
     """关闭心跳服务和 QQ 会话"""
     global client

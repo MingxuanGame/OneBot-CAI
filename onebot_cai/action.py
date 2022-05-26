@@ -9,13 +9,15 @@ from cai import Client
 
 from .log import logger
 from .run import get_client
+from .run import mute_member
 from .utils.database import database
 from .run import get_group_member_info_list
+from .run import set_admin as cai_set_admin
 from .run import get_status as cai_get_status
 from .run import get_group_info as cai_get_group_info
-from .connect.status import STATUS, OKInfo, FailedInfo
 from .const import IMPL, VERSION, PLATFORM, ONEBOT_VERSION
 from .run import get_group_member_info as cai_get_group_member_info
+from .connect.status import STATUS, OKInfo, FailedInfo, SuccessRequest
 from .msg.models import File, FileID, SelfInfo, SentMessage, VersionInfo
 from .msg.message import MessageSegment, DatabaseMessage, get_alt_message
 from .run import (
@@ -273,6 +275,78 @@ async def get_file(echo: str, **kwargs):
         return FailedInfo(
             retcode=31001, echo=echo, message=STATUS[31001], data=None
         )
+
+
+async def ban_group_member(client: Client, echo: str, **kwargs):
+    """
+    禁言群成员
+    https://12.onebot.dev/interface/group/actions/#ban_group_member
+    """
+    if ((group_id := kwargs.get("group_id", None))) and (
+        (user_id := kwargs.get("user_id", None))
+    ):
+        try:
+            group_id = int(group_id)
+            user_id = int(user_id)
+            duration = kwargs.get("qq.duration", 600)
+        except ValueError as e:
+            return FailedInfo(
+                retcode=10004,
+                data={"info": e.args},
+                message=STATUS[10004],
+                echo=echo,
+            )
+        await mute_member(client, group_id, user_id, duration)
+        return OKInfo(data=None, echo=echo)
+    else:
+        return FailedInfo(
+            retcode=10001, data=None, message=STATUS[10001], echo=echo
+        )
+
+
+async def set_admin(
+    client: Client, echo: str, is_admin: bool, **kwargs
+) -> SuccessRequest:
+    """
+    群管理员操作
+    https://12.onebot.dev/interface/group/actions/#set_group_admin
+    https://12.onebot.dev/interface/group/actions/#unset_group_admin
+    """
+    if ((group_id := kwargs.get("group_id", None))) and (
+        (user_id := kwargs.get("user_id", None))
+    ):
+        try:
+            group_id = int(group_id)
+            user_id = int(user_id)
+        except ValueError as e:
+            return FailedInfo(
+                retcode=10004,
+                data={"info": e.args},
+                message=STATUS[10004],
+                echo=echo,
+            )
+        await cai_set_admin(client, group_id, user_id, is_admin)
+        return OKInfo(data=None, echo=echo)
+    else:
+        return FailedInfo(
+            retcode=10001, data=None, message=STATUS[10001], echo=echo
+        )
+
+
+async def set_group_admin(client: Client, echo: str, **kwargs):
+    """
+    设置群管理员
+    https://12.onebot.dev/interface/group/actions/#set_group_admin
+    """
+    return await set_admin(client, echo, True, **kwargs)
+
+
+async def unset_group_admin(client: Client, echo: str, **kwargs):
+    """
+    取消设置群管理员
+    https://12.onebot.dev/interface/group/actions/#unset_group_admin
+    """
+    return await set_admin(client, echo, False, **kwargs)
 
 
 async def upload_file(echo: str, **kwargs):
