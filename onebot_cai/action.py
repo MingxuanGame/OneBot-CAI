@@ -2,6 +2,7 @@
 from time import time
 from uuid import UUID
 from pathlib import Path
+from typing import Union
 from base64 import b64decode
 from binascii import Error as B64Error
 
@@ -12,6 +13,7 @@ from .run import get_client
 from .run import mute_member
 from .run import delete_group_msg
 from .utils.database import database
+from .utils.runtime import get_all_int
 from .run import get_group_member_info_list
 from .run import set_admin as cai_set_admin
 from .run import get_status as cai_get_status
@@ -65,14 +67,13 @@ async def get_user_info(echo: str, **kwargs):
 
     注意：目前仍只能获取好友信息，陌生人信息暂不支持
     """
-    if not (group_id := (kwargs.get("user_id", None))) or not isinstance(
-        group_id, int
-    ):
+    ints = get_all_int(["user_id"], **kwargs)
+    if not ints:
         return FailedInfo(
-            retcode=10004, echo=echo, message=STATUS[10004], data=None
+            retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
     no_cache = kwargs.get("no_cache", True)
-    friend = await cai_get_group_info(group_id, no_cache)
+    friend = await cai_get_group_info(ints[0], no_cache)
     return (
         OKInfo(data=friend, echo=echo)
         if friend
@@ -87,14 +88,13 @@ async def get_group_info(echo: str, **kwargs):
     获取群信息
     https://12.onebot.dev/interface/group/actions/#get_group_info
     """
-    if not (group_id := (kwargs.get("group_id", None))) or not isinstance(
-        group_id, int
-    ):
+    ints = get_all_int(["group_id"], **kwargs)
+    if not ints:
         return FailedInfo(
-            retcode=10004, echo=echo, message=STATUS[10004], data=None
+            retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
     no_cache = kwargs.get("no_cache", True)
-    group = await cai_get_group_info(group_id, not no_cache)
+    group = await cai_get_group_info(ints[0], not no_cache)
     return (
         OKInfo(data=group, echo=echo)
         if group
@@ -118,22 +118,19 @@ async def get_group_member_info(echo: str, **kwargs):
     获取群成员信息
     https://12.onebot.dev/interface/group/actions/#get_group_member_info
     """
-    if (
-        (group_id := kwargs.get("group_id", None))
-        and isinstance(group_id, int)
-    ) and (
-        (user_id := kwargs.get("user_id", None)) and isinstance(user_id, int)
-    ):
-        no_cache = kwargs.get("no_cache", True)
-        member = await cai_get_group_member_info(
-            group_id, user_id, not no_cache
+    ints = get_all_int(["group_id", "user_id"], **kwargs)
+    if not ints:
+        return FailedInfo(
+            retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
-        if member:
-            return OKInfo(data=member, echo=echo)
-        else:
-            return FailedInfo(
-                retcode=35001, data=None, message=STATUS[35001], echo=echo
-            )
+    no_cache = kwargs.get("no_cache", True)
+    member = await cai_get_group_member_info(ints[0], ints[1], not no_cache)
+    if member:
+        return OKInfo(data=member, echo=echo)
+    else:
+        return FailedInfo(
+            retcode=35001, data=None, message=STATUS[35001], echo=echo
+        )
 
 
 async def get_group_member_list(echo: str, **kwargs):
@@ -141,13 +138,13 @@ async def get_group_member_list(echo: str, **kwargs):
     获取群成员列表
     https://12.onebot.dev/interface/group/actions/#get_group_member_list
     """
-    group_id = kwargs.get("group_id", None)
-    no_cache = kwargs.get("no_cache", True)
-    if not group_id:
+    ints = get_all_int(["group_id"], **kwargs)
+    if not ints:
         return FailedInfo(
-            retcode=10004, echo=echo, message=STATUS[10004], data=None
+            retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
-    members = await get_group_member_info_list(group_id, not no_cache)
+    no_cache = kwargs.get("no_cache", True)
+    members = await get_group_member_info_list(ints[0], not no_cache)
     return OKInfo(data=members, echo=echo)  # type: ignore
 
 
@@ -221,21 +218,36 @@ async def send_message(client: Client, echo: str, **kwargs):
     发送消息
     https://12.onebot.dev/interface/message/actions/#send_message
     """
+
+    def _get_int(except_: str) -> Union[int, FailedInfo]:
+        ints = get_all_int([except_], **kwargs)
+        if not ints:
+            return FailedInfo(
+                retcode=10003, echo=echo, message=STATUS[10003], data=None
+            )
+        return ints[0]
+
     message: list = kwargs.get("message", None)
     detail_type = kwargs.get("detail_type", None)
     if not detail_type or not message:
         return FailedInfo(
-            retcode=10004, echo=echo, message=STATUS[10004], data=None
+            retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
     message = [MessageSegment.parse_obj(i) for i in message]
     if detail_type == "group":
-        if group_id := kwargs.get("group_id", None):
+        group_id = _get_int("group_id")
+        if isinstance(group_id, int):
             return await send_group_msg(client, echo, group_id, message)
+        else:
+            return group_id
     elif detail_type == "private":
-        if user_id := kwargs.get("user_id", None):
+        user_id = _get_int("user_id")
+        if isinstance(user_id, int):
             return await send_private_msg(client, echo, user_id, message)
+        else:
+            return user_id
     return FailedInfo(
-        retcode=10004, echo=echo, message=STATUS[10004], data=None
+        retcode=10003, echo=echo, message=STATUS[10003], data=None
     )
 
 
@@ -246,7 +258,7 @@ async def delete_message(client: Client, echo: str, **kwargs):
     https://12.onebot.dev/interface/message/actions/#delete_message
     """
     try:
-        msg_id = kwargs.get("message_id", None)
+        msg_id = str(kwargs.get("message_id", None))
         msg = database.get_message(msg_id)
         if msg:
             if msg.group and msg.seq and msg.rand:
@@ -283,7 +295,7 @@ async def delete_message(client: Client, echo: str, **kwargs):
             )
     except ValueError:
         return FailedInfo(
-            retcode=10004, echo=echo, message=STATUS[10004], data=None
+            retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
 
 
@@ -293,16 +305,16 @@ async def qq_get_message(echo: str, **kwargs):
 
     message_id 消息 ID
     """
-    message_id = kwargs.get("message_id", None)
+    message_id = str(kwargs.get("message_id", None))
     if not message_id:
         return FailedInfo(
-            retcode=10004, echo=echo, message=STATUS[10004], data=None
+            retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
     if message := database.get_message(message_id):
         return OKInfo(data=message, echo=echo)
     else:
         return FailedInfo(
-            retcode=10004, echo=echo, message=STATUS[10004], data=None
+            retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
 
 
@@ -311,8 +323,8 @@ async def get_file(echo: str, **kwargs):
     获取文件
     https://12.onebot.dev/interface/file/actions/#get_file
     """
-    file_id = kwargs.get("file_id")
-    type_ = kwargs.get("type", "url")
+    file_id = str(kwargs.get("file_id"))
+    type_ = str(kwargs.get("type", "url"))
     file = database.get_file(UUID(file_id))
     if file and file.type == type_:
         return OKInfo(data=file, echo=echo)
@@ -327,26 +339,17 @@ async def ban_group_member(client: Client, echo: str, **kwargs):
     禁言群成员
     https://12.onebot.dev/interface/group/actions/#ban_group_member
     """
-    if ((group_id := kwargs.get("group_id", None))) and (
-        (user_id := kwargs.get("user_id", None))
-    ):
-        try:
-            group_id = int(group_id)
-            user_id = int(user_id)
-            duration = kwargs.get("qq.duration", 600)
-        except ValueError as e:
-            return FailedInfo(
-                retcode=10004,
-                data={"info": e.args},
-                message=STATUS[10004],
-                echo=echo,
-            )
-        await mute_member(client, group_id, user_id, duration)
-        return OKInfo(data=None, echo=echo)
-    else:
+    ints = get_all_int(["group_id", "user_id"], **kwargs)
+    if not ints:
         return FailedInfo(
-            retcode=10001, data=None, message=STATUS[10001], echo=echo
+            retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
+    try:
+        duration = kwargs.get("qq.duration", 600)
+    except ValueError:
+        duration = 600
+    await mute_member(client, ints[0], ints[1], duration)
+    return OKInfo(data=None, echo=echo)
 
 
 async def set_admin(
@@ -357,25 +360,13 @@ async def set_admin(
     https://12.onebot.dev/interface/group/actions/#set_group_admin
     https://12.onebot.dev/interface/group/actions/#unset_group_admin
     """
-    if ((group_id := kwargs.get("group_id", None))) and (
-        (user_id := kwargs.get("user_id", None))
-    ):
-        try:
-            group_id = int(group_id)
-            user_id = int(user_id)
-        except ValueError as e:
-            return FailedInfo(
-                retcode=10004,
-                data={"info": e.args},
-                message=STATUS[10004],
-                echo=echo,
-            )
-        await cai_set_admin(client, group_id, user_id, is_admin)
-        return OKInfo(data=None, echo=echo)
-    else:
+    ints = get_all_int(["group_id", "user_id"], **kwargs)
+    if not ints:
         return FailedInfo(
-            retcode=10001, data=None, message=STATUS[10001], echo=echo
+            retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
+    await cai_set_admin(client, ints[0], ints[1], is_admin)
+    return OKInfo(data=None, echo=echo)
 
 
 async def set_group_admin(client: Client, echo: str, **kwargs):
@@ -399,10 +390,10 @@ async def upload_file(echo: str, **kwargs):
     上传文件
     https://12.onebot.dev/interface/file/actions/#upload_file
     """
-    type_ = kwargs.get("type")
+    type_ = str(kwargs.get("type"))
     if not type_ or type_ not in ["url", "data", "path"]:
         return FailedInfo(
-            retcode=10004, echo=echo, message=STATUS[10004], data=None
+            retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
     try:
         name = kwargs["name"]
