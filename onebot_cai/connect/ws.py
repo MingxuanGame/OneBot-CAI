@@ -69,10 +69,12 @@ class ConnectionManager:
             data = dataclass_to_dict(data)
         for connection in self.active_connections:
             address = connection.client
-            logger.debug(
-                f"向正向 WebSocket 客户端 {address.host}:{address.port} 推送事件：{data}"
-            )
-            await connection.send_json(data)
+            if address:
+                logger.debug(
+                    f"向正向 WebSocket 客户端 {address.host}:{address.port} "
+                    f"推送事件：{data}"
+                )
+                await connection.send_json(data)
 
 
 manager = ConnectionManager()

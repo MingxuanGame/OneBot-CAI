@@ -5,7 +5,7 @@ from typing import Union, Optional
 
 from cai.api.client import Client
 from cai.client.events import Event
-from fastapi.responses import JSONResponse
+from fastapi.responses import Response
 from fastapi import Header, FastAPI, status
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from httpx import AsyncClient, ConnectError, HTTPStatusError
@@ -126,7 +126,7 @@ async def root(
     authorization: Optional[str] = Header(None, min_length=7),
 ):
     if SECRET and (not authorization or authorization[7:] != SECRET):
-        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED)
+        return Response(status_code=status.HTTP_401_UNAUTHORIZED)
     action = request_model.action
     if request_model.params:
         request_model.params.update(echo=request_model.echo)
