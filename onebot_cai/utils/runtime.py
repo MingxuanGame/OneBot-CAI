@@ -17,5 +17,6 @@ def get_all_int(
                 result.append(int(value))
             else:
                 raise TypeError
+        return result
     except TypeError:
         return None
