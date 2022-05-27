@@ -179,17 +179,21 @@ async def send_group_msg(
     """发送群消息"""
     try:
         element = await get_base_element(msg)
-        seq, rand, timestamp = await _client.send_group_msg(group_id, element)
-        database.save_message(
-            DatabaseMessage(
-                msg=msg,
-                seq=seq,
-                rand=rand,
-                time=timestamp,
-                group=group_id,
+        if element:
+            seq, rand, timestamp = await _client.send_group_msg(
+                group_id, element
             )
-        )
-        return seq, rand, timestamp
+            database.save_message(
+                DatabaseMessage(
+                    msg=msg,
+                    seq=seq,
+                    rand=rand,
+                    time=timestamp,
+                    group=group_id,
+                )
+            )
+            return seq, rand, timestamp
+        return 0
     except BotMutedException:
         return 1
     except AtAllLimitException:
@@ -218,17 +222,21 @@ async def send_private_msg(
     """发送好友消息"""
     try:
         element = await get_base_element(msg)
-        seq, rand, timestamp = await _client.send_friend_msg(user_id, element)
-        database.save_message(
-            DatabaseMessage(
-                msg=msg,
-                seq=seq,
-                rand=rand,
-                time=timestamp,
-                user=_client.session.uin,
+        if element:
+            seq, rand, timestamp = await _client.send_friend_msg(
+                user_id, element
             )
-        )
-        return seq, rand, timestamp
+            database.save_message(
+                DatabaseMessage(
+                    msg=msg,
+                    seq=seq,
+                    rand=rand,
+                    time=timestamp,
+                    user=_client.session.uin,
+                )
+            )
+            return seq, rand, timestamp
+        return 1
     except BotException:
         return 0
     except Exception:

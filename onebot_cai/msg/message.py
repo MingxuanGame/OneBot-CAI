@@ -18,9 +18,12 @@ from cai.client.message_service.models import (
     VoiceElement,
 )
 
+from ..log import logger
 from .models import File
+from ..exception import SegmentParseError
 from ..connect.exception import HTTPClientError
 from ..utils.media import video_to_mp4, audio_to_silk
+from ..utils.runtime import get_all_int, seq_to_database_id
 
 POKE_NAME = {0: "戳一戳", 2: "比心", 3: "点赞", 4: "心碎", 5: "666", 6: "放大招"}
 
@@ -53,7 +56,12 @@ def get_message_element(
     messages = []
     for i in message:
         if isinstance(i, FaceElement):
-            messages.append(MessageSegment(type="face", data={"id": i.id}))
+            """
+            扩展消息段：QQ 表情
+
+            id 表情 ID
+            """
+            messages.append(MessageSegment(type="qq.face", data={"id": i.id}))
         elif isinstance(i, PokeElement):
             """
             扩展消息段：戳一戳
@@ -95,13 +103,16 @@ def get_message_element(
             messages.append(MessageSegment(type="mention_all", data=None))
         elif isinstance(i, AtElement):
             messages.append(
-                MessageSegment(type="mention", data={"user_id": i.target})
+                MessageSegment(type="mention", data={"user_id": str(i.target)})
             )
         elif isinstance(i, ReplyElement):
             messages.append(
                 MessageSegment(
                     type="reply",
-                    data={"message_id": i.seq, "user_id": i.sender},
+                    data={
+                        "message_id": str(seq_to_database_id(i.seq)),
+                        "user_id": str(i.sender),
+                    },
                 )
             )
         else:
@@ -111,7 +122,7 @@ def get_message_element(
 
 async def get_base_element(
     message: Message, ignore_reply: Optional[bool] = False
-) -> List[Element]:  # sourcery no-metrics
+) -> Optional[List[Element]]:  # sourcery no-metrics
     """OneBot 消息段 转 CAI Element"""
     from ..run import get_client
     from ..utils.database import database
@@ -120,63 +131,91 @@ async def get_base_element(
     client = get_client()
     # TODO log and type hint
     for i in message:
-        type_ = i.type
-        if not ignore_reply and type_ == "reply":
-            if (
-                (data := i.data)
-                and (seq := data.get("message_id"))
-                and (msg := database.get_message(seq))
-                and (user_id := msg.user)
-                and (timestamp := msg.time)
-            ):
-                message_ = await get_base_element(msg.msg, True)
-                messages.append(
-                    ReplyElement(
-                        seq=int(seq),
-                        time=timestamp,
-                        sender=user_id,
-                        message=message_,
-                        troop_name=None,
-                    )
-                )
-        if type_ == "text":
-            if (data := i.data) and (text := data.get("text")):
-                messages.append(TextElement(content=text))
-        elif type_ == "qq.poke":
-            if (data := i.data) and (id_ := data.get("id")):
-                id_ = int(id_)
-                if id_ < 0 or id_ > 6:
-                    continue
-                messages.append(PokeElement(id=id_))
-        elif type_ == "face":
-            if (data := i.data) and (id_ := data.get("id")):
-                messages.append(FaceElement(id_))
-        elif type_ == "mention":
-            if (data := i.data) and (user_id := int(data.get("user_id"))):
-                messages.append(AtElement(user_id, str(user_id)))
-        elif type_ == "mention_all":
-            messages.append(AtAllElement())
-        elif type_ == "image":
-            if bio := await get_binary(i):
-                if client:
-                    messages.append(await client.upload_image(0, BytesIO(bio)))
-        elif type_ in ["voice", "audio"]:
-            if bio := await get_binary(i):
-                silk_data = await audio_to_silk(bio)
-                if client:
-                    messages.append(
-                        await client.upload_voice(0, BytesIO(silk_data))
-                    )
-        elif type_ == "video":
-            if bio := await get_binary(i):
-                mp4, img = await video_to_mp4(bio)
-                if client:
-                    messages.append(
-                        await client.upload_video(
-                            0, BytesIO(mp4), BytesIO(img)
+        try:
+            type_ = i.type
+            if not ignore_reply and type_ == "reply":
+                if (
+                    (data := i.data)
+                    and (message_id := data.get("message_id"))
+                    and (msg := database.get_message(message_id))
+                    and (user_id := msg.user)
+                    and (timestamp := msg.time)
+                ):
+                    message_ = await get_base_element(msg.msg, True)
+                    if message_:
+                        messages.append(
+                            ReplyElement(
+                                seq=msg.seq,
+                                time=timestamp,
+                                sender=user_id,
+                                message=message_,
+                                troop_name=None,
+                            )
                         )
-                    )
-    return messages
+                        continue
+                raise SegmentParseError("reply", i)
+            if type_ == "text":
+                if (data := i.data) and (text := data.get("text")):
+                    messages.append(TextElement(content=str(text)))
+                    continue
+                raise SegmentParseError("text", i)
+            elif type_ == "qq.poke":
+                if data := i.data:
+                    ints = get_all_int(["id"], **data)
+                    if ints and 0 <= ints[0] <= 6:
+                        messages.append(PokeElement(id=ints[0]))
+                        continue
+                raise SegmentParseError("qq.poke", i)
+            elif type_ == "qq.face":
+                if data := i.data:
+                    ints = get_all_int(["id"], **data)
+                    if ints:
+                        messages.append(FaceElement(ints[0]))
+                        continue
+                raise SegmentParseError("qq.face", i)
+            elif type_ == "mention":
+                if data := i.data:
+                    ints = get_all_int(["user_id"], **data)
+                    if ints:
+                        user_id = ints[0]
+                        messages.append(AtElement(user_id, str(user_id)))
+                        continue
+                raise SegmentParseError("mention", i)
+            elif type_ == "mention_all":
+                messages.append(AtAllElement())
+            elif type_ == "image":
+                if bio := await get_binary(i):
+                    if client:
+                        messages.append(
+                            await client.upload_image(0, BytesIO(bio))
+                        )
+                        continue
+                raise SegmentParseError("image", i)
+            elif type_ in ["voice", "audio"]:
+                if bio := await get_binary(i):
+                    silk_data = await audio_to_silk(bio)
+                    if client:
+                        messages.append(
+                            await client.upload_voice(0, BytesIO(silk_data))
+                        )
+                        continue
+                raise SegmentParseError("audio", i)
+            elif type_ == "video":
+                if bio := await get_binary(i):
+                    mp4, img = await video_to_mp4(bio)
+                    if client:
+                        messages.append(
+                            await client.upload_video(
+                                0, BytesIO(mp4), BytesIO(img)
+                            )
+                        )
+                        continue
+                raise SegmentParseError("video", i)
+            logger.warning(f"解析消息段 {type_} 失败：不支持该类型")
+        except SegmentParseError as e:
+            logger.warning(f"解析消息段 {e.name} 失败：可能是类型错误或缺少参数")
+    if messages:
+        return messages
 
 
 async def get_alt_message(
@@ -218,7 +257,7 @@ async def get_alt_message(
                 msg += name
             else:
                 msg += "戳一戳"
-        elif type_ == "face":
+        elif type_ == "qq.face":
             msg += "[表情]"
     return msg
 

@@ -170,6 +170,11 @@ async def send_group_msg(
             data=SentMessage(time=int(time()), message_id=message_id),
             echo=echo,
         )
+    elif result == 0:
+        logger.warning("群消息发送失败：消息为空")
+        return FailedInfo(
+            retcode=10006, message=STATUS[10006], data=None, echo=echo
+        )
     elif result == 2:
         logger.warning("群消息发送失败：@全体成员 次数达到限制")
         return FailedInfo(
@@ -207,8 +212,13 @@ async def send_private_msg(
             data=SentMessage(time=int(time()), message_id=message_id),
             echo=echo,
         )
-    else:
-        logger.warning("群消息发送失败：账号可能被禁言或风控")
+    elif result == 1:
+        logger.warning("好友消息发送失败：消息为空")
+        return FailedInfo(
+            retcode=10006, message=STATUS[10006], data=None, echo=echo
+        )
+    elif result == 0:
+        logger.warning("好友消息发送失败：账号可能被禁言或风控")
         return FailedInfo(
             retcode=34000, message=STATUS[34000], data=None, echo=echo
         )
