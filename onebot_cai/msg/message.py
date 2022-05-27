@@ -200,7 +200,7 @@ async def get_alt_message(
                 if group_id and (
                     member := await get_group_member_info(group_id, user_id)
                 ):
-                    msg += f"@{member.card}"
+                    msg += f"@{member.nickname}"
                 else:
                     msg += f"@{user_id}"
             else:

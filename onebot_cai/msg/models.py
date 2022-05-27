@@ -8,44 +8,29 @@ from pydantic import BaseModel
 class SelfInfo(BaseModel):
     """机器人自身信息"""
 
-    user_id: int
+    user_id: str
     nickname: str
 
 
 class GroupInfo(BaseModel):
     """群信息"""
 
-    group_id: int
+    group_id: str
     group_name: str
-    member_count: int
-    max_member_count: int
 
 
 class FriendInfo(BaseModel):
     """好友信息"""
 
-    user_id: int
+    user_id: str
     nickname: str
 
 
 class GroupMemberInfo(BaseModel):
     """群成员信息"""
 
-    group_id: int
-    user_id: int
+    user_id: str
     nickname: str
-    card: str
-    sex: str = "unknown"
-    age: int
-    area: Union[str, None] = None
-    join_time: int
-    last_send_time: int
-    level: int
-    role: str
-    unfriendly: bool = False
-    title: str
-    title_expire_time: int
-    card_changeable: bool = True
 
 
 class FileID(BaseModel):

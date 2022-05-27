@@ -41,7 +41,8 @@ async def get_self_info(echo: str):
     if client := get_client():
         return OKInfo(
             data=SelfInfo(
-                user_id=client.session.uin, nickname=client.session.nick or ""
+                user_id=str(client.session.uin),
+                nickname=client.session.nick or "",
             ),
             echo=echo,
         )

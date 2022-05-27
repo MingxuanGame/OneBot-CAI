@@ -87,17 +87,8 @@ async def get_group_member_info_list(
             onebot_member_list.extend(
                 [
                     GroupMemberInfo(
-                        group_id=group_id,
-                        user_id=member.uin,
+                        user_id=str(member.uin),
                         nickname=member.nick,
-                        card=member.nick,
-                        age=member.age,
-                        join_time=member.join_time,
-                        last_send_time=member.last_speak_time,
-                        level=member.member_level,
-                        role=member.role,
-                        title=member.special_title,
-                        title_expire_time=member.special_title_expire_time,
                     )
                     for member in member_list
                 ]
@@ -113,10 +104,8 @@ async def get_group_info(
         group = await client.session.get_group(group_id, not no_cache)
         if group:
             return GroupInfo(
-                group_id=group.group_uin,
+                group_id=str(group.group_uin),
                 group_name=group.group_name,
-                member_count=group.member_num,
-                max_member_count=group.max_group_member_num,
             )
 
 
@@ -126,10 +115,8 @@ async def get_group_info_list() -> List[GroupInfo]:
         group_list = await client.session.get_group_list()
         return [
             GroupInfo(
-                group_id=group.group_uin,
+                group_id=str(group.group_uin),
                 group_name=group.group_name,
-                member_count=group.member_num,
-                max_member_count=group.max_group_member_num,
             )
             for group in group_list
         ]
@@ -141,7 +128,7 @@ async def get_friend_info_list(no_cache: bool = True) -> List[FriendInfo]:
     if client:
         friend_list = await client.session.get_friend_list(not no_cache)
         return [
-            FriendInfo(user_id=friend.uin, nickname=friend.nick)
+            FriendInfo(user_id=str(friend.uin), nickname=friend.nick)
             for friend in friend_list
         ]
     return []
