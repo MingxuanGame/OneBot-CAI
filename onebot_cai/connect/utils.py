@@ -9,7 +9,14 @@ from ..config import config
 from ..run import run_action
 from .models import RequestModel
 from ..run import init as cai_init
+from ..utils.database import database
+from ..msg.message import DatabaseMessage
 from .status import STATUS, FailedInfo, SuccessRequest
+from ..msg.event_model import (
+    BaseMessageEvent,
+    GroupMessageEvent,
+    PrivateMessageEvent,
+)
 
 
 async def init(
@@ -56,3 +63,24 @@ async def run_action_by_dict(data: dict) -> SuccessRequest:
         )
         resp.echo = echo
     return resp
+
+
+def save_message(event: BaseMessageEvent) -> Optional[str]:
+    save_msg = None
+    if isinstance(event, GroupMessageEvent):
+        save_msg = DatabaseMessage(
+            msg=event.message,
+            time=int(event.time),
+            seq=event.__seq__,
+            group=event.group_id,
+            rand=event.__rand__,
+        )
+    elif isinstance(event, PrivateMessageEvent):
+        save_msg = DatabaseMessage(
+            msg=event.message,
+            time=int(event.time),
+            seq=event.__seq__,
+            user=event.user_id,
+        )
+    if save_msg:
+        return database.save_message(save_msg)

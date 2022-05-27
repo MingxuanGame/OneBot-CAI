@@ -10,6 +10,7 @@ from msgpack import packb, unpackb
 
 from ..msg import event_model
 from ..msg.models import File
+from .runtime import seq_to_database_id
 from ..msg.message import MessageSegment, DatabaseMessage
 from ..msg.event_model import BaseEvent, dataclass_to_dict, dict_to_dataclass
 
@@ -102,12 +103,12 @@ class Database:
 
         message 消息对象
         """
-        id_ = str(uuid4().int)[:10]
-        return self._pack_data(message.dict(), id_)
+        return self._pack_data(message)
 
-    def _pack_data(self, arg0, id_):
-        event_byte = packb(arg0, use_bin_type=True)
-        self.db.put(str(id_).encode(), event_byte)
+    def _pack_data(self, data: DatabaseMessage) -> str:
+        id_ = str(seq_to_database_id(data.seq))
+        msg_byte = packb(data.dict(), use_bin_type=True)
+        self.db.put(id_.encode(), msg_byte)
         return id_
 
     def get_message(self, _id: str) -> Optional[DatabaseMessage]:
@@ -118,7 +119,9 @@ class Database:
         """
         if message := self.db.get(_id.encode()):
             message = unpackb(message, raw=False)
-            segments = [MessageSegment.parse_obj(msg) for msg in message["msg"]]
+            segments = [
+                MessageSegment.parse_obj(msg) for msg in message["msg"]
+            ]
             return DatabaseMessage(
                 msg=segments,
                 seq=message["seq"],

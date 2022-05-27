@@ -13,22 +13,17 @@ from cai import Client
 from cai.client.events.base import Event
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from onebot_cai.msg.message import DatabaseMessage
-
 from ..run import close
 from ..log import logger
 from ..config import config
 from ..const import make_header
 from .exception import RunComplete
-from ..utils.database import database
-from .utils import init, run_action_by_dict
 from ..msg.event import cai_event_to_dataclass
+from .utils import init, save_message, run_action_by_dict
 from ..msg.event_model import (
     BaseEvent,
     HeartbeatEvent,
     BaseMessageEvent,
-    GroupMessageEvent,
-    PrivateMessageEvent,
     dataclass_to_dict,
 )
 
@@ -146,24 +141,7 @@ class WebSocketClient:
         """推送 Event"""
         if data := await cai_event_to_dataclass(client.session.uin, event):
             if isinstance(data, BaseMessageEvent):
-                save_msg = None
-                if isinstance(data, GroupMessageEvent):
-                    save_msg = DatabaseMessage(
-                        msg=data.message,
-                        time=int(data.time),
-                        seq=data.__seq__,
-                        group=data.group_id,
-                        rand=data.__rand__,
-                    )
-                elif isinstance(data, PrivateMessageEvent):
-                    save_msg = DatabaseMessage(
-                        msg=data.message,
-                        time=int(data.time),
-                        seq=data.__seq__,
-                        user=data.user_id,
-                    )
-                if save_msg:
-                    id_ = database.save_message(save_msg)
+                if id_ := save_message(data):
                     setattr(data, "message_id", id_)
             event_data = dataclass_to_dict(data)
             await self.request(event_data)

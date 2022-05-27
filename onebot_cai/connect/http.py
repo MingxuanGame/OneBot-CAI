@@ -10,21 +10,17 @@ from fastapi import Header, FastAPI, status
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from httpx import AsyncClient, ConnectError, HTTPStatusError
 
-from .utils import init
 from ..log import logger
 from ..config import config
 from ..const import make_header
 from .models import RequestModel
 from ..run import close, run_action
-from ..utils.database import database
-from ..msg.message import DatabaseMessage
+from .utils import init, save_message
 from ..msg.event import cai_event_to_dataclass
 from ..msg.event_model import (
     BaseEvent,
     HeartbeatEvent,
     BaseMessageEvent,
-    GroupMessageEvent,
-    PrivateMessageEvent,
     dataclass_to_dict,
 )
 
@@ -83,24 +79,7 @@ async def push_event(client: Client, event: Event):
     bot_id = client.session.uin
     if data := await cai_event_to_dataclass(bot_id, event):
         if isinstance(data, BaseMessageEvent):
-            save_msg = None
-            if isinstance(data, GroupMessageEvent):
-                save_msg = DatabaseMessage(
-                    msg=data.message,
-                    time=int(data.time),
-                    seq=data.__seq__,
-                    group=data.group_id,
-                    rand=data.__rand__,
-                )
-            elif isinstance(data, PrivateMessageEvent):
-                save_msg = DatabaseMessage(
-                    msg=data.message,
-                    time=int(data.time),
-                    seq=data.__seq__,
-                    user=data.user_id,
-                )
-            if save_msg:
-                id_ = database.save_message(save_msg)
+            if id_ := save_message(data):
                 setattr(data, "message_id", id_)
         await request(data=data, bot_id=bot_id)
 

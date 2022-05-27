@@ -12,16 +12,12 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 from ..run import close
 from ..log import logger
 from ..config import config
-from ..utils.database import database
-from ..msg.message import DatabaseMessage
-from .utils import init, run_action_by_dict
 from ..msg.event import cai_event_to_dataclass
+from .utils import init, save_message, run_action_by_dict
 from ..msg.event_model import (
     BaseEvent,
     HeartbeatEvent,
     BaseMessageEvent,
-    GroupMessageEvent,
-    PrivateMessageEvent,
     dataclass_to_dict,
 )
 
@@ -112,24 +108,7 @@ async def push_event(client: Client, event: Event):
     bot_id = client.session.uin
     if data := await cai_event_to_dataclass(bot_id, event):
         if isinstance(data, BaseMessageEvent):
-            save_msg = None
-            if isinstance(data, GroupMessageEvent):
-                save_msg = DatabaseMessage(
-                    msg=data.message,
-                    time=int(data.time),
-                    seq=data.__seq__,
-                    group=data.group_id,
-                    rand=data.__rand__,
-                )
-            elif isinstance(data, PrivateMessageEvent):
-                save_msg = DatabaseMessage(
-                    msg=data.message,
-                    time=int(data.time),
-                    seq=data.__seq__,
-                    user=data.user_id,
-                )
-            if save_msg:
-                id_ = database.save_message(save_msg)
+            if id_ := save_message(data):
                 setattr(data, "message_id", id_)
         await manager.broadcast(data)
 

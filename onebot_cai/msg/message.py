@@ -37,7 +37,7 @@ Message = List[MessageSegment]
 
 class DatabaseMessage(BaseModel):
     msg: Message
-    seq: Optional[int] = None
+    seq: int
     rand: Optional[int] = None
     time: Optional[int] = None
     group: Optional[int] = None
