@@ -1,9 +1,17 @@
 """OneBot CAI 事件模型模块"""
-from typing import Literal
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
+from typing import Literal, Optional
 
 from .message import Message, MessageSegment
+
+LUCKY_CHARACTER_OPERATE = {
+    "GroupLuckyCharacterInitEvent": ("init", "抽中并使用"),
+    "GroupLuckyCharacterNewEvent": ("new", "抽中"),
+    "GroupLuckyCharacterChangedEvent": ("changed", "修改"),
+    "GroupLuckyCharacterClosedEvent": ("closed", "关闭"),
+    "GroupLuckyCharacterOpenedEvent": ("opened", "开启"),
+}
 
 
 @dataclass
@@ -155,7 +163,6 @@ class GroupMemberIncreaseEvent(BaseNoticeEvent):
         self._sub_type = value
 
 
-# TODO: need dependent
 @dataclass
 class GroupMemberDecreaseEvent(BaseNoticeEvent):
     """
@@ -210,6 +217,40 @@ class GroupMessageDeleteEvent(BaseNoticeEvent):
 
 
 @dataclass
+class GroupAdminSet(BaseNoticeEvent):
+    """
+    群管理员设置事件
+    https://12.onebot.dev/interface/group/notice-events/#noticegroup_admin_set
+    """
+
+    __event__ = "notice.group_admin_set"
+    group_id: int
+    user_id: int
+    operator_id: int
+
+    @property
+    def detail_type(self) -> str:
+        return "group_admin_set"
+
+
+@dataclass
+class GroupAdminUnSet(BaseNoticeEvent):
+    """
+    群管理员取消设置事件
+    https://12.onebot.dev/interface/group/notice-events/#noticegroup_admin_unset
+    """
+
+    __event__ = "notice.group_admin_unset"
+    group_id: int
+    user_id: int
+    operator_id: int
+
+    @property
+    def detail_type(self) -> str:
+        return "group_admin_unset"
+
+
+@dataclass
 class GroupNameChangedEvent(BaseNoticeEvent):
     """
     扩展事件：群名称修改通知
@@ -240,7 +281,6 @@ class GroupMemberSpecialTitleChangedEvent(BaseNoticeEvent):
         return "qq.group_member_special_title_changed"
 
 
-# TODO: need dependent
 @dataclass
 class GroupLuckyCharacterEvent(BaseNoticeEvent):
     """
@@ -251,13 +291,16 @@ class GroupLuckyCharacterEvent(BaseNoticeEvent):
     # 抽取并开启，抽中，关闭，开启，更改
     action: Literal["init", "new", "closed", "opened", "changed"]
     user_id: int
-    img_url: str
+    group_id: int
+    old_img_url: Optional[str]
+    new_img_url: Optional[str]
 
     @property
     def detail_type(self) -> str:
         return "qq.group_lucky_character"
 
 
+@dataclass
 class JoinGroupRequestEvent(BaseRequestEvent):
     """
     扩展事件：加群请求
@@ -265,12 +308,14 @@ class JoinGroupRequestEvent(BaseRequestEvent):
 
     __event__ = "request.qq.join_group_request"
     user_id: int
+    group_id: int
     nickname: str
-    request_id: str
     is_invited: bool
+    seq: int
+    uid: int
 
     @property
-    def datail_type(self) -> str:
+    def detail_type(self) -> str:
         return "qq.join_group_request"
 
 
