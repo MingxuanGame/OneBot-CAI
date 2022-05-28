@@ -144,7 +144,7 @@ typing-extensions = "^4.1.0"
 type = "git"
 url = "https://github.com/wyapx/CAI.git"
 reference = "dev"
-resolved_reference = "b84b9ba82fe869cdc6f7d9074d8df884db512728"
+resolved_reference = "e0229cf5ca433cda941d6b373bb95ed55c9e175c"
 
 [[package]]
 name = "certifi"
