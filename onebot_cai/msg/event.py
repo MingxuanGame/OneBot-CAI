@@ -3,13 +3,12 @@ from time import time
 from uuid import uuid4
 from typing import Union
 
+from cai.client.events.common import BotOnlineEvent
 from cai.client.events.base import Event as CAIEvent
-from cai.client.events.common import BotOnlineEvent, BotOfflineEvent
+from cai.client.events.common import BotOfflineEvent
+from cai.client.events.common import GroupMessage as BaseGroupMessage
+from cai.client.events.common import PrivateMessage as BasePrivateMessage
 from cai.client.events.group import GroupNudgeEvent as BaseGroupNudgeEvent
-from cai.client.message_service.models import GroupMessage as BaseGroupMessage
-from cai.client.message_service.models import (
-    PrivateMessage as BasePrivateMessage,
-)
 from cai.client.events.group import (
     GroupMemberLeaveEvent,
     GroupMemberMutedEvent,
