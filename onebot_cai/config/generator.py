@@ -57,7 +57,7 @@ WEBSOCKET_CONFIG = """\n
 # 正向 WebSocket 连接设置
 [ws]
 # 监听 IP
-host = {ws_url}
+host = "{ws_url}"
 # 监听端口
 port = {ws_port}"""
 REVERSE_CONFIG = """\n
