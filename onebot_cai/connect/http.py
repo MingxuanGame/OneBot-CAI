@@ -1,12 +1,15 @@
 """OneBot CAI HTTP 与 HTTP WebHook 模块"""
 from time import time
 from uuid import uuid4
-from typing import Union, Optional
+from typing import Any, Union, Callable, Optional
 
 from cai.api.client import Client
+from msgpack import packb, unpackb
 from cai.client.events import Event
+from fastapi.routing import APIRoute
 from fastapi.responses import Response
-from fastapi import Header, FastAPI, status
+from starlette.background import BackgroundTask
+from fastapi import Header, FastAPI, Request, status
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from httpx import AsyncClient, ConnectError, HTTPStatusError
 
@@ -33,8 +36,56 @@ else:
     ADDRESS = TIMEOUT = None
 del HTTP, WEBHOOK
 SECRET = config.universal.access_token
-app = FastAPI()
 scheduler: Optional[AsyncIOScheduler]
+
+
+# Custom Encoding
+class MsgpackRequest(Request):
+    async def body(self) -> bytes:
+        if not hasattr(self, "_body"):
+            body = await super().body()
+            if self.headers.get("Content-Type") in [
+                # https://12.onebot.dev/onebotrpc/communication/http/#content-type
+                "application/msgpack",
+                # https://github.com/msgpack/msgpack/issues/194
+                "application/x-msgpack",
+            ]:
+                body = unpackb(body, raw=False)
+            self._body = body
+        return self._body
+
+
+class MsgpackResponse(Response):
+    media_type = "application/msgpack"
+
+    def __init__(
+        self,
+        content: Any,
+        status_code: int = 200,
+        headers: Optional[dict] = None,
+        media_type: Optional[str] = None,
+        background: Optional[BackgroundTask] = None,
+    ) -> None:
+        super().__init__(content, status_code, headers, media_type, background)
+
+    def render(self, content: Any) -> Optional[bytes]:
+        return packb(content)
+
+
+class MsgpackRoute(APIRoute):
+    def get_route_handler(self) -> Callable:
+        original_route_handler = super().get_route_handler()
+
+        async def custom_route_handler(request: Request) -> Response:
+            request = MsgpackRequest(request.scope, request.receive)
+            return await original_route_handler(request)
+
+        return custom_route_handler
+
+
+app = FastAPI()
+# app.add_middleware(MessagePackMiddleware)
+app.router.route_class = MsgpackRoute
 
 
 async def request(
@@ -101,6 +152,7 @@ async def shutdown():
 @app.post("/")
 async def root(
     request_model: RequestModel,
+    content_type: str = Header(),
     authorization: Optional[str] = Header(None, min_length=7),
 ):
     if SECRET and (not authorization or authorization[7:] != SECRET):
@@ -111,4 +163,7 @@ async def root(
         params = request_model.params
     else:
         params = {"echo": request_model.echo}
-    return await run_action(action, **params)
+    resp = await run_action(action, **params)
+    if content_type in {"application/msgpack", "application/x-msgpack"}:
+        resp = MsgpackResponse(resp.dict())
+    return resp

@@ -1,10 +1,12 @@
 """OneBot CAI 正向 WebSocket 模块"""
 from time import time
+from json import loads
 from uuid import uuid4
 from typing import List, Union, Optional
 
 from fastapi import FastAPI
 from cai.api.client import Client
+from msgpack import packb, unpackb
 from cai.client.events.base import Event
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from starlette.websockets import WebSocket, WebSocketDisconnect
@@ -96,9 +98,21 @@ async def root(websocket: WebSocket):
         return
     try:
         while True:
-            data = await websocket.receive_json()
-            resp = await run_action_by_dict(data)
-            await websocket.send_json(resp.dict())
+            message = await websocket.receive()
+            websocket._raise_on_disconnect(message)
+            is_msgpack = False
+            if "text" in message:
+                data = loads(message["text"])
+            else:
+                is_msgpack = True
+                data = unpackb(message["bytes"])
+            print(data)
+            resp = (await run_action_by_dict(data)).dict()
+            if is_msgpack:
+                pack = packb(resp)
+                await websocket.send_bytes(pack)  # type: ignore
+            else:
+                await websocket.send_json(resp)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 

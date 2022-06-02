@@ -8,10 +8,12 @@ from uuid import uuid4
 from json import dumps, loads
 from typing import Union, Optional
 
-import websockets
 from cai import Client
+from msgpack import packb, unpackb
 from cai.client.events.base import Event
+from websockets.legacy.client import connect
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from ..run import close
 from ..log import logger
@@ -74,7 +76,7 @@ class WebSocketClient:
                     bot_id, False, config.universal.access_token
                 )
                 logger.info(f"尝试连接反向 WebSocket 服务器：{self.address}")
-                async with websockets.connect(  # type: ignore
+                async with connect(
                     self.address, extra_headers=headers
                 ) as websocket:
                     logger.success(f"成功连接反向 WebSocket 服务器：" f"{self.address}")
@@ -84,9 +86,18 @@ class WebSocketClient:
                             while True:
                                 if is_closed:
                                     raise RunComplete
-                                data = loads(await websocket.recv())
-                                resp = await run_action_by_dict(data)
-                                await websocket.send(resp.json())
+                                recv = await websocket.recv()
+                                is_json = isinstance(recv, str)
+                                data = (
+                                    loads(recv) if is_json else unpackb(recv)
+                                )
+                                result = (
+                                    await run_action_by_dict(data)
+                                ).dict()
+                                resp = (
+                                    dumps(result) if is_json else packb(result)
+                                )
+                                await websocket.send(resp)  # type: ignore
 
                         async def send(is_closed: list):
                             while True:
@@ -101,7 +112,7 @@ class WebSocketClient:
                             receive(self.is_close),
                             return_exceptions=False,
                         )
-                    except websockets.ConnectionClosed as e:  # type: ignore
+                    except ConnectionClosed as e:
                         logger.warning(
                             f"反向 WebSocket 连接断开：{str(e)}，将于"
                             f"{self.interval}毫秒后重连"
@@ -111,7 +122,7 @@ class WebSocketClient:
                     except Exception:
                         logger.exception("在 WebSocket 连接中出现异常")
             except (
-                websockets.WebSocketException,  # type: ignore
+                WebSocketException,
                 ConnectionRefusedError,
             ) as e:
                 logger.warning(
