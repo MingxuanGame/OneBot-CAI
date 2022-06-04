@@ -270,8 +270,7 @@ async def delete_message(client: Client, echo: str, **kwargs):
     """
     try:
         msg_id = str(kwargs.get("message_id", None))
-        msg = database.get_message(msg_id)
-        if msg:
+        if msg := database.get_message(msg_id):
             if msg.group and msg.seq and msg.rand:
                 func = delete_group_msg(
                     client,
