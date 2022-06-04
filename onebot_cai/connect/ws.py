@@ -66,8 +66,7 @@ class ConnectionManager:
         if isinstance(data, BaseEvent):
             data = dataclass_to_dict(data)
         for connection in self.active_connections:
-            address = connection.client
-            if address:
+            if address := connection.client:
                 logger.debug(
                     f"向正向 WebSocket 客户端 {address.host}:{address.port} "
                     f"推送事件：{data}"

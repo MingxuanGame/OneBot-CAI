@@ -122,7 +122,7 @@ def get_message_element(
 
 async def get_base_element(
     message: Message, ignore_reply: Optional[bool] = False
-) -> Optional[List[Element]]:  # sourcery no-metrics
+) -> Optional[List[Element]]:    # sourcery no-metrics
     """OneBot 消息段 转 CAI Element"""
     from ..run import get_client
     from ..utils.database import database
@@ -168,15 +168,13 @@ async def get_base_element(
                 raise SegmentParseError("qq.poke", i)
             elif type_ == "qq.face":
                 if data := i.data:
-                    ints = get_all_int(["id"], **data)
-                    if ints:
+                    if ints := get_all_int(["id"], **data):
                         messages.append(FaceElement(ints[0]))
                         continue
                 raise SegmentParseError("qq.face", i)
             elif type_ == "mention":
                 if data := i.data:
-                    ints = get_all_int(["user_id"], **data)
-                    if ints:
+                    if ints := get_all_int(["user_id"], **data):
                         user_id = ints[0]
                         messages.append(AtElement(user_id, str(user_id)))
                         continue
