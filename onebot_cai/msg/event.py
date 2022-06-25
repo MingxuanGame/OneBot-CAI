@@ -68,7 +68,11 @@ async def cai_event_to_dataclass(
             logger.debug(
                 f"将 CAI PrivateMessage 转换为 " f"PrivateMessageEvent（seq：{seq}）"
             )
-            logger.info(f"收到好友 {user_id} 的消息：{alt_message}")
+            if len(alt_message) > 15:
+                log_message = alt_message[:15] + "..."
+            else:
+                log_message = alt_message
+            logger.info(f"收到好友 {user_id} 的消息：{log_message}")
             return PrivateMessageEvent(
                 time=time(),
                 id=str(uuid4()),
@@ -88,7 +92,11 @@ async def cai_event_to_dataclass(
             logger.debug(
                 f"将 CAI GroupMessage 转换为 " f"GroupMessageEvent（seq：{seq}）"
             )
-            logger.info(f"收到群 {group_id} 成员 {user_id} 的消息：{alt_message}")
+            if len(alt_message) > 15:
+                log_message = alt_message[:15] + "..."
+            else:
+                log_message = alt_message
+            logger.info(f"收到群 {group_id} 成员 {user_id} 的消息：{log_message}")
             return GroupMessageEvent(
                 time=time(),
                 id=str(uuid4()),
