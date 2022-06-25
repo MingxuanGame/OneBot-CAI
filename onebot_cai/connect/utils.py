@@ -10,7 +10,7 @@ from ..run import run_action
 from .models import RequestModel
 from ..run import init as cai_init
 from ..utils.database import database
-from ..msg.message import DatabaseMessage
+from ..msg.models.message import DatabaseMessage
 from .status import STATUS, FailedInfo, SuccessRequest
 from ..msg.event_model import (
     BaseMessageEvent,

@@ -1,10 +1,11 @@
 """OneBot CAI 消息模块"""
 from uuid import UUID
 from io import BytesIO
-from typing import List, Optional
+from inspect import isclass
+from typing import Dict, List, Union, Optional
 
-from pydantic import BaseModel
 from aiofiles import open as aio_open
+from pydantic.error_wrappers import ValidationError
 from httpx import AsyncClient, ConnectError, HTTPStatusError
 from cai.client.message_service.models import (
     Element,
@@ -19,32 +20,48 @@ from cai.client.message_service.models import (
 )
 
 from ..log import logger
-from .models import File
+from .models import message
+from .models.others import File
 from ..exception import SegmentParseError
+from ..utils.runtime import seq_to_database_id
 from ..connect.exception import HTTPClientError
 from ..utils.media import video_to_mp4, audio_to_silk
-from ..utils.runtime import get_all_int, seq_to_database_id
+from .models.message import (
+    POKE_NAME,
+    Message,
+    FaceSegment,
+    PokeSegment,
+    TextSegment,
+    AudioSegment,
+    ImageSegment,
+    ReplySegment,
+    VideoSegment,
+    VoiceSegment,
+    MentionSegment,
+    MentionAllSegment,
+)
 
-POKE_NAME = {0: "戳一戳", 2: "比心", 3: "点赞", 4: "心碎", 5: "666", 6: "放大招"}
+message_type = {}
+
+for item in vars(message).values():
+    if isclass(item) and message.MessageSegment in item.__bases__:
+        type_ = item.__fields__["type"].default  # type: ignore
+        message_type[type_] = item
 
 
-class MessageSegment(BaseModel):
-    """OneBot 消息段"""
-
-    type: str
-    data: Optional[dict]
-
-
-Message = List[MessageSegment]
-
-
-class DatabaseMessage(BaseModel):
-    msg: Message
-    seq: int
-    rand: Optional[int] = None
-    time: Optional[int] = None
-    group: Optional[int] = None
-    user: Optional[int] = None
+def dict_to_message(
+    raw: Dict[str, Union[str, dict]]
+) -> Optional[message.MessageSegment]:
+    type_ = raw.get("type")
+    if not type_:
+        raise ValueError("There is no `type` in the message segment")
+    message_type_ = message_type.get(type_, message.MessageSegment)
+    try:
+        return message_type_.parse_obj(raw)
+    except ValidationError as e:
+        raise ValueError(
+            "Raised validation error when pydantic parsing"
+        ) from e
 
 
 def get_message_element(
@@ -61,7 +78,7 @@ def get_message_element(
 
             id 表情 ID
             """
-            messages.append(MessageSegment(type="qq.face", data={"id": i.id}))
+            messages.append(FaceSegment.parse_obj(dict(data={"id": i.id})))
         elif isinstance(i, PokeElement):
             """
             扩展消息段：戳一戳
@@ -76,9 +93,10 @@ def get_message_element(
             name 戳一戳名称，发送时可不填
             """
             messages.append(
-                MessageSegment(
-                    type="qq.poke",
-                    data={"id": i.id, "name": POKE_NAME.get(i.id)},
+                PokeSegment.parse_obj(
+                    dict(
+                        data={"id": i.id, "name": POKE_NAME.get(i.id)},
+                    )
                 )
             )
         elif isinstance(i, ImageElement):
@@ -86,43 +104,44 @@ def get_message_element(
                 File(name=i.filename, type="url", url=i.url)
             )
             messages.append(
-                MessageSegment(type="image", data={"file_id": str(id_)})
+                ImageSegment.parse_obj(dict(data={"file_id": str(id_)}))
             )
         elif isinstance(i, VoiceElement):
             id_ = database.save_file(
                 File(name=i.file_name, type="url", url=i.url)
             )
             messages.append(
-                MessageSegment(type="voice", data={"file_id": str(id_)})
+                VoiceSegment.parse_obj(dict(data={"file_id": str(id_)}))
             )
         elif isinstance(i, TextElement):
             messages.append(
-                MessageSegment(type="text", data={"text": i.content})
+                TextSegment.parse_obj(dict(data={"text": i.content}))
             )
         elif isinstance(i, AtAllElement):
-            messages.append(MessageSegment(type="mention_all", data=None))
+            messages.append(MentionAllSegment())
         elif isinstance(i, AtElement):
             messages.append(
-                MessageSegment(type="mention", data={"user_id": str(i.target)})
+                MentionSegment.parse_obj(dict(data={"user_id": str(i.target)}))
             )
         elif isinstance(i, ReplyElement):
             messages.append(
-                MessageSegment(
-                    type="reply",
-                    data={
-                        "message_id": str(seq_to_database_id(i.seq)),
-                        "user_id": str(i.sender),
-                    },
+                ReplySegment.parse_obj(
+                    dict(
+                        data={
+                            "message_id": str(seq_to_database_id(i.seq)),
+                            "user_id": str(i.sender),
+                        },
+                    )
                 )
             )
         else:
-            messages.append(MessageSegment(type="text", data={"text": str(i)}))
+            logger.warning("未解析的 CAI Element：{i.__class__.__name__}")
     return messages
 
 
 async def get_base_element(
     message: Message, ignore_reply: Optional[bool] = False
-) -> Optional[List[Element]]:  # sourcery no-metrics
+) -> Optional[List[Element]]:  # sourcery skip: low-code-quality
     """OneBot 消息段 转 CAI Element"""
     from ..run import get_client
     from ..utils.database import database
@@ -132,12 +151,9 @@ async def get_base_element(
     # TODO log and type hint
     for i in message:
         try:
-            type_ = i.type
-            if not ignore_reply and type_ == "reply":
+            if isinstance(i, ReplySegment) and not ignore_reply:
                 if (
-                    (data := i.data)
-                    and (message_id := data.get("message_id"))
-                    and (msg := database.get_message(message_id))
+                    (msg := database.get_message(i.data.message_id))
                     and (user_id := msg.user)
                     and (timestamp := msg.time)
                 ):
@@ -153,43 +169,41 @@ async def get_base_element(
                             )
                         )
                         continue
-                raise SegmentParseError("reply", i)
-            if type_ == "text":
-                if (data := i.data) and (text := data.get("text")):
-                    messages.append(TextElement(content=str(text)))
+                raise SegmentParseError(i)
+            elif isinstance(i, TextSegment):
+                data = i.data
+                messages.append(TextElement(content=data.text))
+                continue
+            elif isinstance(i, PokeSegment):
+                data = i.data
+                id_ = data.id
+                if 0 <= id_ <= 6:
+                    messages.append(PokeElement(id=id_))
                     continue
-                raise SegmentParseError("text", i)
-            elif type_ == "qq.poke":
-                if data := i.data:
-                    ints = get_all_int(["id"], **data)
-                    if ints and 0 <= ints[0] <= 6:
-                        messages.append(PokeElement(id=ints[0]))
-                        continue
-                raise SegmentParseError("qq.poke", i)
-            elif type_ == "qq.face":
-                if data := i.data:
-                    if ints := get_all_int(["id"], **data):
-                        messages.append(FaceElement(ints[0]))
-                        continue
-                raise SegmentParseError("qq.face", i)
-            elif type_ == "mention":
-                if data := i.data:
-                    if ints := get_all_int(["user_id"], **data):
-                        user_id = ints[0]
-                        messages.append(AtElement(user_id, str(user_id)))
-                        continue
-                raise SegmentParseError("mention", i)
-            elif type_ == "mention_all":
+                raise SegmentParseError(i)
+            elif isinstance(i, FaceSegment):
+                data = i.data
+                id_ = data.id
+                messages.append(FaceElement(id=id_))
+                continue
+            elif isinstance(i, MentionSegment):
+                data = i.data
+                user_id = data.user_id
+                messages.append(
+                    AtElement(target=int(user_id), display=user_id)
+                )
+                continue
+            elif isinstance(i, MentionAllSegment):
                 messages.append(AtAllElement())
-            elif type_ == "image":
+            elif isinstance(i, ImageSegment):
                 if bio := await get_binary(i):
                     if client:
                         messages.append(
                             await client.upload_image(0, BytesIO(bio))
                         )
                         continue
-                raise SegmentParseError("image", i)
-            elif type_ in ["voice", "audio"]:
+                raise SegmentParseError(i)
+            elif isinstance(i, (VoiceSegment, AudioSegment)):
                 if bio := await get_binary(i):
                     silk_data = await audio_to_silk(bio)
                     if client:
@@ -197,8 +211,8 @@ async def get_base_element(
                             await client.upload_voice(0, BytesIO(silk_data))
                         )
                         continue
-                raise SegmentParseError("audio", i)
-            elif type_ == "video":
+                raise SegmentParseError(i)
+            elif isinstance(i, VideoSegment):
                 if bio := await get_binary(i):
                     mp4, img = await video_to_mp4(bio)
                     if client:
@@ -208,12 +222,22 @@ async def get_base_element(
                             )
                         )
                         continue
-                raise SegmentParseError("video", i)
-            logger.warning(f"解析消息段 {type_} 失败：不支持该类型")
+                raise SegmentParseError(i)
+            logger.warning(f"解析消息段 {i.type} 失败：不支持该类型")
         except SegmentParseError as e:
             logger.warning(f"解析消息段 {e.name} 失败：可能是类型错误或缺少参数")
     if messages:
         return messages
+
+
+segment_alt_messages = {
+    "ImageSegment": "[图片]",
+    "VoiceSegment": "[语音]",
+    "AudioSegment": "[语音]",
+    "MentionAllSegment": "@全体成员",
+    "VideoSegment": "[视频]",
+    "FaceSegment": "[表情]",
+}
 
 
 async def get_alt_message(
@@ -224,50 +248,31 @@ async def get_alt_message(
 
     msg = ""
     for i in message:
-        type_ = i.type
-        if type_ == "text":
-            if (data := i.data) and (text := data.get("text")):
-                msg += text
-        elif type_ == "image":
-            msg += "[图片]"
-        elif type_ in ["voice", "audio"]:
-            msg += "[语音]"
-        elif type_ == "mention":
-            if (data := i.data) and (user_id := data.get("user_id")):
-                if group_id and (
-                    member := await get_group_member_info(group_id, user_id)
-                ):
-                    msg += f"@{member.nickname}"
-                else:
-                    msg += f"@{user_id}"
-            else:
-                msg += "@某人"
-        elif type_ == "mention_all":
-            msg += "@全体成员"
-        elif type_ == "video":
-            msg += "视频"
-        elif type_ == "qq.poke":
-            if (
-                (data := i.data)
-                and (id_ := data.get("id"))
-                and (name := POKE_NAME.get(id_))
+        if text := segment_alt_messages.get(i.__class__.__name__):
+            msg += text
+        elif isinstance(i, TextSegment):
+            msg += i.data.text
+        elif isinstance(i, MentionSegment):
+            user_id = i.data.user_id
+            if group_id and (
+                member := await get_group_member_info(group_id, int(user_id))
             ):
-                msg += name
+                msg += f"@{member.nickname}"
             else:
-                msg += "戳一戳"
-        elif type_ == "qq.face":
-            msg += "[表情]"
+                msg += f"@{user_id}"
+        elif isinstance(i, PokeSegment):
+            msg += POKE_NAME.get(i.data.id, "戳一戳")
     return msg
 
 
-async def get_binary(element: MessageSegment) -> Optional[bytes]:
+async def get_binary(
+    segment: Union[ImageSegment, VoiceSegment, AudioSegment, VideoSegment]
+) -> Optional[bytes]:
     """获取二进制数据"""
     from ..utils.database import database
 
-    if (
-        (data := element.data)
-        and (file_id := data.get("file_id"))
-        and (file := database.get_file(UUID(file_id)))  # noqa
+    if (file_id := segment.data.file_id) and (
+        file := database.get_file(UUID(file_id))
     ):
         if file.type == "url" and (url := file.url):
             data = await get_http_data(url, file.headers)

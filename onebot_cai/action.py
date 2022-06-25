@@ -19,18 +19,14 @@ from .run import set_admin as cai_set_admin
 from .run import get_status as cai_get_status
 from .run import get_group_info as cai_get_group_info
 from .run import send_group_msg as cai_send_group_msg
+from .msg.models.message import Message, DatabaseMessage
+from .msg.message import dict_to_message, get_alt_message
 from .run import send_private_msg as cai_send_private_msg
 from .const import IMPL, VERSION, PLATFORM, ONEBOT_VERSION
 from .run import get_group_member_info as cai_get_group_member_info
 from .connect.status import STATUS, OKInfo, FailedInfo, SuccessRequest
-from .msg.models import File, FileID, SelfInfo, SentMessage, VersionInfo
 from .run import delete_private_msg, get_group_info_list, get_friend_info_list
-from .msg.message import (
-    Message,
-    MessageSegment,
-    DatabaseMessage,
-    get_alt_message,
-)
+from .msg.models.others import File, FileID, SelfInfo, SentMessage, VersionInfo
 
 
 async def get_self_info(echo: str):
@@ -238,13 +234,19 @@ async def send_message(client: Client, echo: str, **kwargs):
             )
         return ints[0]
 
-    message: list = kwargs.get("message", None)
+    raw_message: list = kwargs.get("message", None)
     detail_type = kwargs.get("detail_type", None)
-    if not detail_type or not message:
+    if not detail_type or not raw_message:
         return FailedInfo(
             retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
-    message = [MessageSegment.parse_obj(i) for i in message]
+    message = []
+    for i in raw_message:
+        try:
+            message_segment = dict_to_message(i)
+            message.append(message_segment)
+        except ValueError:
+            logger.warning("解析消息段失败，可能是格式不符合")
     if detail_type == "group":
         group_id = _get_int("group_id")
         if isinstance(group_id, int):

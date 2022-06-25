@@ -19,9 +19,15 @@ from .login import login
 from .config import config
 from .const import Protocol
 from .utils.database import database
-from .msg.message import Message, DatabaseMessage, get_base_element
+from .msg.message import get_base_element
+from .msg.models.message import Message, DatabaseMessage
 from .connect.status import STATUS, OKInfo, FailedInfo, SuccessRequest
-from .msg.models import GroupInfo, FriendInfo, StatusInfo, GroupMemberInfo
+from .msg.models.others import (
+    GroupInfo,
+    FriendInfo,
+    StatusInfo,
+    GroupMemberInfo,
+)
 
 client: Optional[Client] = None
 

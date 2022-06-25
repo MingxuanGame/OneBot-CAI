@@ -7,7 +7,7 @@ from .message import (
     get_base_element,
     get_message_element,
 )
-from .models import (
+from .models.others import (
     File,
     FileID,
     GroupInfo,

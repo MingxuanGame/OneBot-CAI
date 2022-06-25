@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import Literal, Optional
 
-from .message import Message, MessageSegment
+from .models.message import Message, MessageSegment
 
 LUCKY_CHARACTER_OPERATE = {
     "GroupLuckyCharacterInitEvent": ("init", "抽中并使用"),

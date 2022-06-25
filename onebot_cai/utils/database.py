@@ -6,9 +6,9 @@ from uuid import UUID, uuid4
 from plyvel import DB
 from msgpack import packb, unpackb
 
-from ..msg.models import File
+from ..msg.models.others import File
 from .runtime import seq_to_database_id
-from ..msg.message import MessageSegment, DatabaseMessage
+from ..msg.models.message import MessageSegment, DatabaseMessage
 
 
 class Database:

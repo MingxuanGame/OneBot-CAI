@@ -1,12 +1,12 @@
 """OneBot CAI 通用异常模块"""
-from typing import Any
+from .msg.models.message import MessageSegment
 
 
 class SegmentParseError(Exception):
     """消息段解析异常"""
 
-    def __init__(self, name: str, content: Any) -> None:
-        self.name = name
+    def __init__(self, content: MessageSegment) -> None:
+        self.name = content.type
         self.content = content
 
     def __str__(self) -> str:
