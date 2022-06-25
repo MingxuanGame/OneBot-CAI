@@ -22,7 +22,7 @@ from ..const import make_header
 from .exception import RunComplete
 from ..msg.event import cai_event_to_dataclass
 from .utils import init, save_message, run_action_by_dict
-from ..msg.event_model import (
+from ..msg.models.event import (
     BaseEvent,
     HeartbeatEvent,
     BaseMessageEvent,

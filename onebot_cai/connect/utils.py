@@ -12,7 +12,7 @@ from ..run import init as cai_init
 from ..utils.database import database
 from ..msg.models.message import DatabaseMessage
 from .status import STATUS, FailedInfo, SuccessRequest
-from ..msg.event_model import (
+from ..msg.models.event import (
     BaseMessageEvent,
     GroupMessageEvent,
     PrivateMessageEvent,

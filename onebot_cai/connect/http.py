@@ -20,7 +20,7 @@ from .models import RequestModel
 from ..run import close, run_action
 from .utils import init, save_message
 from ..msg.event import cai_event_to_dataclass
-from ..msg.event_model import (
+from ..msg.models.event import (
     BaseEvent,
     HeartbeatEvent,
     BaseMessageEvent,

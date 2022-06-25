@@ -16,7 +16,7 @@ from ..log import logger
 from ..config import config
 from ..msg.event import cai_event_to_dataclass
 from .utils import init, save_message, run_action_by_dict
-from ..msg.event_model import (
+from ..msg.models.event import (
     BaseEvent,
     HeartbeatEvent,
     BaseMessageEvent,
