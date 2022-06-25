@@ -81,7 +81,7 @@ manager = ConnectionManager()
 async def startup():
     global scheduler
 
-    scheduler = await init(heartbeat, push_event)
+    scheduler = await init(push_event=push_event, heartbeat=heartbeat)
 
 
 @app.on_event("shutdown")

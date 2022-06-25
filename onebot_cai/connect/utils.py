@@ -20,14 +20,14 @@ from ..msg.event_model import (
 
 
 async def init(
-    heartbeat: Callable, push_event: Callable
+    push_event: Callable, heartbeat: Optional[Callable] = None
 ) -> Optional[AsyncIOScheduler]:
     """初始化 QQ 会话和心跳"""
     loop = get_event_loop()
     uin = config.account.uin
     loop.create_task(cai_init(uin, config.account.password, push_event))
 
-    if heartbeat_config := config.heartbeat:
+    if heartbeat and (heartbeat_config := config.heartbeat):
         if heartbeat_config.enabled:
             scheduler = AsyncIOScheduler()
             interval = heartbeat_config.interval

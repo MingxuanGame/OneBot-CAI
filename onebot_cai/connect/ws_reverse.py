@@ -184,7 +184,7 @@ async def run():
     global scheduler
 
     logger.info(f"OneBot CAI 运行于 PID {getpid()}")
-    scheduler = await init(heartbeat, push_event)
+    scheduler = await init(push_event=push_event, heartbeat=heartbeat)
     task = asyncio.create_task(websocket_client.run(config.account.uin))
     await asyncio.gather(task)
 

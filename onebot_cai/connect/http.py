@@ -112,19 +112,6 @@ async def request(
             )
 
 
-async def heartbeat(bot_id: int, interval: int):
-    """心跳服务"""
-    await request(
-        data=HeartbeatEvent(
-            id=str(uuid4()),
-            time=time(),
-            self_id=bot_id,
-            interval=interval,
-        ),
-        bot_id=bot_id,
-    )
-
-
 async def push_event(client: Client, event: Event):
     """向 HTTP WebHook 服务器推送事件"""
     bot_id = client.session.uin
@@ -139,7 +126,7 @@ async def push_event(client: Client, event: Event):
 async def startup():
     global scheduler
 
-    scheduler = await init(heartbeat, push_event)
+    scheduler = await init(push_event=push_event)
 
 
 @app.on_event("shutdown")
