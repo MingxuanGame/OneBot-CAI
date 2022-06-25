@@ -122,7 +122,7 @@ def get_message_element(
 
 async def get_base_element(
     message: Message, ignore_reply: Optional[bool] = False
-) -> Optional[List[Element]]:    # sourcery no-metrics
+) -> Optional[List[Element]]:  # sourcery no-metrics
     """OneBot 消息段 转 CAI Element"""
     from ..run import get_client
     from ..utils.database import database
