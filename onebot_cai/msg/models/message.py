@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Union, Optional
 
 from pydantic import BaseModel
 
@@ -11,7 +11,7 @@ class MessageSegment(BaseModel):
     """OneBot 消息段"""
 
     type: str
-    data: Optional[dict] = None
+    data: Optional[Union[dict, list]] = None
 
 
 Message = List[MessageSegment]
@@ -174,3 +174,45 @@ class ReplySegment(MessageSegment):
 
     type: str = "reply"
     data: Reply
+
+
+class ForwardNode(BaseModel):
+    user_id: int
+    nickname: str
+    time: int
+    message: Message
+
+
+class Forward(BaseModel):
+    group_id: int
+    brief: Optional[str]
+    nodes: List[ForwardNode]
+
+
+class ForwardSegment(MessageSegment):
+    """
+    扩展消息段：合并转发
+
+    转发内容为一个 Forward，Forward 中 ForwardNode 样例如下
+
+    ```json
+    [
+        {
+            "user_id": 123456,
+            "nickname": "abcdef",
+            "time": 1145141919,
+            "message": [
+                {
+                    "type": "text",
+                    "data": {
+                        "text": "test"
+                    }
+                }
+            ]
+        }
+    ]
+    ```
+    """
+
+    type: str = "qq.forward"
+    data: Forward

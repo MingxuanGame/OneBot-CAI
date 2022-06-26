@@ -2,7 +2,7 @@
 from uuid import UUID
 from io import BytesIO
 from inspect import isclass
-from typing import Dict, List, Union, Optional
+from typing import Dict, List, Union, Optional, Sequence
 
 from aiofiles import open as aio_open
 from pydantic.error_wrappers import ValidationError
@@ -17,6 +17,7 @@ from cai.client.message_service.models import (
     ImageElement,
     ReplyElement,
     VoiceElement,
+    ForwardMessage,
 )
 
 from ..log import logger
@@ -30,6 +31,7 @@ from .models.message import (
     POKE_NAME,
     Message,
     FaceSegment,
+    ForwardNode,
     PokeSegment,
     TextSegment,
     AudioSegment,
@@ -37,6 +39,7 @@ from .models.message import (
     ReplySegment,
     VideoSegment,
     VoiceSegment,
+    ForwardSegment,
     MentionSegment,
     MentionAllSegment,
 )
@@ -65,7 +68,7 @@ def dict_to_message(
 
 
 def get_message_element(
-    message: List[Element],
+    message: Sequence[Element],
 ) -> Message:
     """CAI Element 转 OneBot 消息段"""
     from ..utils.database import database
@@ -79,6 +82,28 @@ def get_message_element(
             id 表情 ID
             """
             messages.append(FaceSegment.parse_obj(dict(data={"id": i.id})))
+        elif isinstance(i, ForwardMessage):
+            nodes = []
+            for i in i.nodes:
+                nodes.append(
+                    ForwardNode(
+                        user_id=i.from_uin,
+                        nickname=i.nickname,
+                        time=i.send_time,
+                        message=get_message_element(i.message),
+                    )
+                )
+            messages.append(
+                ForwardSegment.parse_obj(
+                    dict(
+                        data={
+                            "group_id": i.from_group,
+                            "brief": i.brief,
+                            "nodes": nodes,
+                        }
+                    )
+                )
+            )
         elif isinstance(i, PokeElement):
             """
             扩展消息段：戳一戳
@@ -135,7 +160,7 @@ def get_message_element(
                 )
             )
         else:
-            logger.warning("未解析的 CAI Element：{i.__class__.__name__}")
+            logger.warning(f"未解析的 CAI Element：{i.__class__.__name__}")
     return messages
 
 
@@ -262,6 +287,8 @@ async def get_alt_message(
                 msg += f"@{user_id}"
         elif isinstance(i, PokeSegment):
             msg += POKE_NAME.get(i.data.id, "戳一戳")
+        elif isinstance(i, ForwardSegment):
+            msg += brief if (brief := i.data.brief) else "[聊天记录]"
     return msg
 
 

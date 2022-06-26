@@ -85,6 +85,7 @@ async def cai_event_to_dataclass(
     elif isinstance(event, BaseGroupMessage):
         if event.from_uin != bot_id:
             seq = event.seq
+            pass
             message = get_message_element(event.message)
             group_id = event.group_id
             user_id = event.from_uin
