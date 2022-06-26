@@ -7,10 +7,9 @@ from typing import Dict, List, Union, Optional, Sequence
 from aiofiles import open as aio_open
 from pydantic.error_wrappers import ValidationError
 from httpx import AsyncClient, ConnectError, HTTPStatusError
+from cai.client.message_service.models import ForwardNode as CAIForwardNode
+from cai.client.message_service.models import Element, AtElement, FaceElement
 from cai.client.message_service.models import (
-    Element,
-    AtElement,
-    FaceElement,
     PokeElement,
     TextElement,
     AtAllElement,
@@ -65,6 +64,12 @@ def dict_to_message(
         raise ValueError(
             "Raised validation error when pydantic parsing"
         ) from e
+
+
+def message_segment_to_sub_segment(
+    segment: message.MessageSegment,
+) -> Optional[message.MessageSegment]:
+    return dict_to_message(segment.dict())
 
 
 def get_message_element(
@@ -165,17 +170,23 @@ def get_message_element(
 
 
 async def get_base_element(
-    message: Message, ignore_reply: Optional[bool] = False
+    messages: Message, ignore_reply: Optional[bool] = False
 ) -> Optional[List[Element]]:  # sourcery skip: low-code-quality
     """OneBot 消息段 转 CAI Element"""
     from ..run import get_client
     from ..utils.database import database
 
-    messages = []
+    messages_ = []
     client = get_client()
     # TODO log and type hint
-    for i in message:
+    for i in messages:
         try:
+            if isinstance(i, message.MessageSegment):
+                try:
+                    i = message_segment_to_sub_segment(i)
+                except ValueError:
+                    logger.warning("解析消息段失败，可能是格式不符合")
+                    continue
             if isinstance(i, ReplySegment) and not ignore_reply:
                 if (
                     (msg := database.get_message(i.data.message_id))
@@ -184,7 +195,7 @@ async def get_base_element(
                 ):
                     message_ = await get_base_element(msg.msg, True)
                     if message_:
-                        messages.append(
+                        messages_.append(
                             ReplyElement(
                                 seq=msg.seq,
                                 time=timestamp,
@@ -195,35 +206,55 @@ async def get_base_element(
                         )
                         continue
                 raise SegmentParseError(i)
+            elif isinstance(i, ForwardSegment):
+                nodes = []
+                for j in i.data.nodes:
+                    elements = await get_base_element(j.message)
+                    if elements:
+                        nodes.append(
+                            CAIForwardNode(
+                                j.user_id,
+                                j.nickname,
+                                j.time,
+                                elements,
+                            )
+                        )
+                    else:
+                        logger.warning("未成功解析转发消息")
+                if client:
+                    messages_.append(
+                        await client.upload_forward_msg(i.data.group_id, nodes)
+                    )
+                    continue
             elif isinstance(i, TextSegment):
                 data = i.data
-                messages.append(TextElement(content=data.text))
+                messages_.append(TextElement(content=data.text))
                 continue
             elif isinstance(i, PokeSegment):
                 data = i.data
                 id_ = data.id
                 if 0 <= id_ <= 6:
-                    messages.append(PokeElement(id=id_))
+                    messages_.append(PokeElement(id=id_))
                     continue
                 raise SegmentParseError(i)
             elif isinstance(i, FaceSegment):
                 data = i.data
                 id_ = data.id
-                messages.append(FaceElement(id=id_))
+                messages_.append(FaceElement(id=id_))
                 continue
             elif isinstance(i, MentionSegment):
                 data = i.data
                 user_id = data.user_id
-                messages.append(
+                messages_.append(
                     AtElement(target=int(user_id), display=user_id)
                 )
                 continue
             elif isinstance(i, MentionAllSegment):
-                messages.append(AtAllElement())
+                messages_.append(AtAllElement())
             elif isinstance(i, ImageSegment):
                 if bio := await get_binary(i):
                     if client:
-                        messages.append(
+                        messages_.append(
                             await client.upload_image(0, BytesIO(bio))
                         )
                         continue
@@ -232,7 +263,7 @@ async def get_base_element(
                 if bio := await get_binary(i):
                     silk_data = await audio_to_silk(bio)
                     if client:
-                        messages.append(
+                        messages_.append(
                             await client.upload_voice(0, BytesIO(silk_data))
                         )
                         continue
@@ -241,18 +272,17 @@ async def get_base_element(
                 if bio := await get_binary(i):
                     mp4, img = await video_to_mp4(bio)
                     if client:
-                        messages.append(
+                        messages_.append(
                             await client.upload_video(
                                 0, BytesIO(mp4), BytesIO(img)
                             )
                         )
                         continue
                 raise SegmentParseError(i)
-            logger.warning(f"解析消息段 {i.type} 失败：不支持该类型")
         except SegmentParseError as e:
             logger.warning(f"解析消息段 {e.name} 失败：可能是类型错误或缺少参数")
-    if messages:
-        return messages
+    if messages_:
+        return messages_
 
 
 segment_alt_messages = {
