@@ -423,13 +423,15 @@ async def upload_file(echo: str, **kwargs):
                 raise
             file = File(type="path", name=name, path=path)
         elif type_ == "data":
-            data = b64decode(kwargs["data"])
+            data: Union[str, bytes] = kwargs["data"]
+            if isinstance(data, str):
+                data = b64decode(data)
             file = File(type="data", name=name, data=data)
         else:
             raise RuntimeError
         id_ = database.save_file(file)
         return OKInfo(data=FileID(file_id=str(id_)), echo=echo)
-    except KeyError or RuntimeError or B64Error:
+    except (KeyError, RuntimeError, B64Error):
         return FailedInfo(
             retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
