@@ -346,10 +346,13 @@ async def get_file(echo: str, **kwargs):
         )
 
 
-async def ban_group_member(client: Client, echo: str, **kwargs):
+async def qq_ban_group_member(client: Client, echo: str, **kwargs):
     """
-    禁言群成员
-    https://12.onebot.dev/interface/group/actions/#ban_group_member
+    扩展动作：禁言群成员
+
+    group_id：群号
+    user_id：被禁言群成员的 QQ 号
+    duration：禁言时间，单位为秒（默认为 600）
     """
     ints = get_all_int(["group_id", "user_id"], **kwargs)
     if not ints:
@@ -357,7 +360,7 @@ async def ban_group_member(client: Client, echo: str, **kwargs):
             retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
     try:
-        duration = kwargs.get("qq.duration", 600)
+        duration = kwargs.get("duration", 600)
     except ValueError:
         duration = 600
     await mute_member(client, ints[0], ints[1], duration)
@@ -369,8 +372,6 @@ async def set_admin(
 ) -> SuccessRequest:
     """
     群管理员操作
-    https://12.onebot.dev/interface/group/actions/#set_group_admin
-    https://12.onebot.dev/interface/group/actions/#unset_group_admin
     """
     ints = get_all_int(["group_id", "user_id"], **kwargs)
     if not ints:
@@ -381,18 +382,22 @@ async def set_admin(
     return OKInfo(data=None, echo=echo)
 
 
-async def set_group_admin(client: Client, echo: str, **kwargs):
+async def qq_set_group_admin(client: Client, echo: str, **kwargs):
     """
-    设置群管理员
-    https://12.onebot.dev/interface/group/actions/#set_group_admin
+    扩展动作：设置群管理员
+
+    group_id：群号
+    user_id：群成员的 QQ 号
     """
     return await set_admin(client, echo, True, **kwargs)
 
 
-async def unset_group_admin(client: Client, echo: str, **kwargs):
+async def qq_unset_group_admin(client: Client, echo: str, **kwargs):
     """
-    取消设置群管理员
-    https://12.onebot.dev/interface/group/actions/#unset_group_admin
+    扩展动作：取消设置群管理员
+
+    group_id：群号
+    user_id：群成员的 QQ 号
     """
     return await set_admin(client, echo, False, **kwargs)
 
