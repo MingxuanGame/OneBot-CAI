@@ -47,9 +47,9 @@ event_enabled = {use_get_latest_events}
 # 事件缓冲区大小，超过该大小将会丢弃最旧的事件，0 表示不限大小
 event_buffer_size = {event_buffer_size}"""
 WEBHOOK_CONFIG = """\n
-# HTTP WebHook 连接设置
+# HTTP Webhook 连接设置
 [http.webhook]
-# WebHook 推送地址
+# Webhook 推送地址
 url = "{webhook_url}"
 # 推送请求超时时间（毫秒），0 表示不超时
 timeout = {timeout}"""
@@ -136,9 +136,9 @@ def create_config():
                 event_buffer_size=event_buffer_size,
             )
         )
-        use_webhook = _to_bool("是否启用 WebHook", True)
+        use_webhook = _to_bool("是否启用 Webhook", True)
         if use_webhook == "true":
-            url = _not_null("WebHook 推送地址")
+            url = _not_null("Webhook 推送地址")
             timeout = _int_while("推送请求超时时间（毫秒），0 表示不超时")
             config_list.append(
                 WEBHOOK_CONFIG.format(webhook_url=url, timeout=timeout)

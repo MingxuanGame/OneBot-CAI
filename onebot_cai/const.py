@@ -29,7 +29,7 @@ def make_header(
     bot_id: int, with_type: bool, secret: Optional[str] = None
 ) -> dict:
     """
-    生成 OneBot 标准规定的请求头，用于 HTTP WebHook 和正向 WebSocket
+    生成 OneBot 标准规定的请求头，用于 HTTP Webhook 和正向 WebSocket
     """
     headers = {
         "X-Self-ID": str(bot_id),

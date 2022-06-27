@@ -41,7 +41,7 @@ class HeartBeatConfig(BaseModel):
     """心跳间隔（毫秒）"""
 
 
-class HTTPWebHookConfig(BaseModel):
+class HTTPWebhookConfig(BaseModel):
     """
     OneBot 12 HTTP Webhook 配置
     https://12.onebot.dev/onebotrpc/communication/http-webhook
@@ -67,7 +67,7 @@ class HTTPConfig(BaseModel):
     """是否启用 get_latest_events 元动作"""
     event_buffer_size: Optional[int] = 0
     """事件缓冲区大小，0 表示不限大小"""
-    webhook: Optional[HTTPWebHookConfig] = None
+    webhook: Optional[HTTPWebhookConfig] = None
     """HTTP Webhook 配置"""
 
 
@@ -132,7 +132,7 @@ class Config(BaseModel):
     """心跳元事件"""
 
     http: Optional[HTTPConfig] = None
-    """HTTP 和 HTTP WebHook 连接配置"""
+    """HTTP 和 HTTP Webhook 连接配置"""
     ws: Optional[WebSocketConfig] = None
     """正向 WebSocket 连接配置"""
     ws_reverse: Optional[ReverseWebSocketConfig] = None

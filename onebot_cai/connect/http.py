@@ -1,4 +1,4 @@
-"""OneBot CAI HTTP 与 HTTP WebHook 模块"""
+"""OneBot CAI HTTP 与 HTTP Webhook 模块"""
 from time import time
 from uuid import uuid4
 from typing import Any, Union, Callable, Optional
@@ -92,28 +92,28 @@ async def request(
     data: Union[BaseEvent, dict],
     bot_id: int,
 ):
-    """向 HTTP WebHook 服务器发送请求"""
+    """向 HTTP Webhook 服务器发送请求"""
     if ADDRESS:
         try:
             headers = make_header(bot_id, True, config.universal.access_token)
             if isinstance(data, BaseEvent):
                 data = dataclass_to_dict(data)
-            logger.debug(f"向 HTTP WebHook 服务器推送事件：{data}")
+            logger.debug(f"向 HTTP Webhook 服务器推送事件：{data}")
             async with AsyncClient(headers=headers) as http_client:
                 resp = await http_client.post(
                     ADDRESS, json=data, timeout=TIMEOUT
                 )
                 resp.raise_for_status()
         except ConnectError as e:
-            logger.warning(f"向 HTTP WebHook 服务器推送事件失败：{str(e)}")
+            logger.warning(f"向 HTTP Webhook 服务器推送事件失败：{str(e)}")
         except HTTPStatusError as e:
             logger.warning(
-                f"向 HTTP WebHook 服务器推送事件失败：意外的状态码 {e.response.status_code}"
+                f"向 HTTP Webhook 服务器推送事件失败：意外的状态码 {e.response.status_code}"
             )
 
 
 async def push_event(client: Client, event: Event):
-    """向 HTTP WebHook 服务器推送事件"""
+    """向 HTTP Webhook 服务器推送事件"""
     bot_id = client.session.uin
     if data := await cai_event_to_dataclass(bot_id, event):
         if isinstance(data, BaseMessageEvent):
