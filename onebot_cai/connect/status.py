@@ -33,6 +33,18 @@ STATUS = {
 OneBot 12 状态码
 https://12.onebot.dev/onebotrpc/data-protocol/action-response/#_3
 """
+ERROR_HTTP_REQUEST_MESSAGE = {
+    401: "Unauthorized.",
+    404: "Not Found. Maybe you need to request / path.",
+    405: "Method Not Allowed. You need to use the POST method, "
+    "but you used {method}.",
+    415: "Unsupported Media Type. You need to make the Content-Type header be "
+    "application/json or application/msgpack.",
+}
+"""
+错误 HTTP 请求消息
+参考 https://12.onebot.dev/connect/communication/http/#_3
+"""
 
 
 class SuccessRequest(BaseModel):

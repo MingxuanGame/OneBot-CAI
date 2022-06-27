@@ -1,13 +1,13 @@
 """OneBot CAI HTTP 与 HTTP Webhook 模块"""
-from typing import Any, Union, Callable, Optional
+from typing import Union, Callable, Optional
 
+from msgpack import unpackb
 from cai.api.client import Client
-from msgpack import packb, unpackb
 from cai.client.events import Event
 from fastapi.routing import APIRoute
 from fastapi.responses import Response
-from starlette.background import BackgroundTask
-from fastapi import Header, FastAPI, Request, status
+from starlette.exceptions import HTTPException
+from fastapi import Header, Depends, FastAPI, Request
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from httpx import AsyncClient, ConnectError, HTTPStatusError
 
@@ -16,9 +16,15 @@ from ..config import config
 from ..const import make_header
 from .models import RequestModel
 from ..run import close, run_action
-from .utils import init, save_message
 from ..msg.event import cai_event_to_dataclass
 from ..msg.models.event import BaseEvent, BaseMessageEvent, dataclass_to_dict
+from .utils import (
+    MsgpackResponse,
+    init,
+    save_message,
+    check_authorization,
+    register_exception_handles,
+)
 
 HTTP = config.http
 WEBHOOK = HTTP.webhook if HTTP else None
@@ -48,23 +54,6 @@ class MsgpackRequest(Request):
         return self._body
 
 
-class MsgpackResponse(Response):
-    media_type = "application/msgpack"
-
-    def __init__(
-        self,
-        content: Any,
-        status_code: int = 200,
-        headers: Optional[dict] = None,
-        media_type: Optional[str] = None,
-        background: Optional[BackgroundTask] = None,
-    ) -> None:
-        super().__init__(content, status_code, headers, media_type, background)
-
-    def render(self, content: Any) -> Optional[bytes]:
-        return packb(content)
-
-
 class MsgpackRoute(APIRoute):
     def get_route_handler(self) -> Callable:
         original_route_handler = super().get_route_handler()
@@ -79,6 +68,7 @@ class MsgpackRoute(APIRoute):
 app = FastAPI()
 # app.add_middleware(MessagePackMiddleware)
 app.router.route_class = MsgpackRoute
+register_exception_handles(app)
 
 
 async def request(
@@ -129,14 +119,15 @@ async def shutdown():
     await close(scheduler)
 
 
-@app.post("/")
-async def root(
-    request_model: RequestModel,
-    content_type: str = Header(),
-    authorization: Optional[str] = Header(None, min_length=7),
+async def depend_check_authorization(
+    authorization: Optional[str] = Header(None),
 ):
-    if SECRET and (not authorization or authorization[7:] != SECRET):
-        return Response(status_code=status.HTTP_401_UNAUTHORIZED)
+    if not check_authorization(authorization):
+        raise HTTPException(status_code=401)
+
+
+@app.post("/", dependencies=[Depends(depend_check_authorization)])
+async def root(request_model: RequestModel, content_type: str = Header()):
     action = request_model.action
     if request_model.params:
         request_model.params.update(echo=request_model.echo)

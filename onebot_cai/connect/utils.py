@@ -1,8 +1,14 @@
 """OneBot CAI 连接通用模块"""
 from asyncio import get_event_loop
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
+from msgpack import packb
+from fastapi import FastAPI, Request
 from pydantic import ValidationError
+from starlette.exceptions import HTTPException
+from starlette.background import BackgroundTask
+from fastapi.responses import Response, JSONResponse
+from fastapi.exceptions import RequestValidationError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from ..config import config
@@ -11,12 +17,36 @@ from .models import RequestModel
 from ..run import init as cai_init
 from ..utils.database import database
 from ..msg.models.message import DatabaseMessage
-from .status import STATUS, FailedInfo, SuccessRequest
+from .status import (
+    STATUS,
+    ERROR_HTTP_REQUEST_MESSAGE,
+    FailedInfo,
+    SuccessRequest,
+)
 from ..msg.models.event import (
     BaseMessageEvent,
     GroupMessageEvent,
     PrivateMessageEvent,
 )
+
+SECRET = config.universal.access_token
+
+
+class MsgpackResponse(Response):
+    media_type = "application/msgpack"
+
+    def __init__(
+        self,
+        content: Any,
+        status_code: int = 200,
+        headers: Optional[dict] = None,
+        media_type: Optional[str] = None,
+        background: Optional[BackgroundTask] = None,
+    ) -> None:
+        super().__init__(content, status_code, headers, media_type, background)
+
+    def render(self, content: Any) -> Optional[bytes]:
+        return packb(content)
 
 
 async def init(
@@ -84,3 +114,118 @@ def save_message(event: BaseMessageEvent) -> Optional[str]:
         )
     if save_msg:
         return database.save_message(save_msg)
+
+
+def check_authorization(authorization: Optional[str] = None) -> bool:
+    """鉴权"""
+    # authorization = "Bearer xxx"
+    # https://12.onebot.dev/connect/communication/http/#_1
+    return bool(
+        not SECRET or authorization and f"Bearer {SECRET}" == authorization
+    )
+
+
+def register_exception_handles(app: FastAPI):
+    """
+    注册异常处理函数，仅适用于 HTTP 和正向 WebSocket
+
+    FIXME: 在正向 WebSocket，只会返回 403
+    有关此问题，请参考 [encode/uvicorn#1181](https://github.com/encode/uvicorn/issues/1181)
+
+    注：在 ASGI 规范中，对拒绝响应应使用 HTTP 状态码 403 [ASGI WebSocket 规范-close](https://github.com/django/asgiref/blob/main/specs/www.rst#close---send-event)
+    但是在 [ASGI WebSocket 拒绝响应扩展](https://github.com/django/asgiref/blob/main/docs/extensions.rst#websocket-denial-response)，允许 ASGI 框架控制拒绝响应
+    """
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        ResponseType = (
+            JSONResponse
+            if request.headers.get("Content-Type") == "application/json"
+            else MsgpackResponse
+        )
+        status_code = exc.status_code
+        if status_code == 405:
+            return ResponseType(
+                content=FailedInfo(
+                    retcode=10001,
+                    message=STATUS[10001],
+                    data={
+                        "reason": ERROR_HTTP_REQUEST_MESSAGE.get(
+                            status_code, ""
+                        ).format(method=request.method)
+                    },
+                ).dict(),
+                status_code=status_code,
+            )
+        elif status_code == 404:
+            return ResponseType(
+                content=FailedInfo(
+                    retcode=10001,
+                    message=STATUS[10001],
+                    data={"reason": ERROR_HTTP_REQUEST_MESSAGE.get(404)},
+                ).dict(),
+                status_code=status_code,
+            )
+        elif status_code == 401:
+            return ResponseType(
+                content=FailedInfo(
+                    retcode=10001,
+                    message=STATUS[10001],
+                    data={"reason": ERROR_HTTP_REQUEST_MESSAGE.get(401)},
+                ).dict(),
+                status_code=401,
+            )
+        elif status_code == 400:
+            return MsgpackResponse(
+                content=FailedInfo(
+                    retcode=10001,
+                    message=STATUS[10001],
+                    data={"reason": "MessagePack data is invalid"},
+                ).dict(),
+                status_code=200,
+            )
+        else:
+            raise exc
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ):
+        content_type = request.headers.get("Content-Type")
+        if content_type not in {
+            "application/json",
+            "application/msgpack",
+            "application/x-msgpack",
+        }:
+            return JSONResponse(
+                content=FailedInfo(
+                    retcode=10001,
+                    message=STATUS[10001],
+                    data={"reason": ERROR_HTTP_REQUEST_MESSAGE.get(415)},
+                ).dict(),
+                status_code=415,
+            )
+
+        body = exc.body
+        ResponseType = (
+            JSONResponse
+            if request.headers.get("Content-Type") == "application/json"
+            else MsgpackResponse
+        )
+        if isinstance(body, bytes):
+            try:
+                body = body.decode()
+            except UnicodeDecodeError:
+                body = (
+                    "So sorry, we cannot parse the bytes type to string type"
+                )
+        return ResponseType(
+            content=FailedInfo(
+                retcode=10001,
+                message=STATUS[10001],
+                data={"errors": exc.errors(), "body": body},
+            ).dict(),
+            status_code=200,
+        )
+
+    return http_exception_handler, validation_exception_handler
