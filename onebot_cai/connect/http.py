@@ -1,6 +1,4 @@
 """OneBot CAI HTTP 与 HTTP Webhook 模块"""
-from time import time
-from uuid import uuid4
 from typing import Any, Union, Callable, Optional
 
 from cai.api.client import Client
@@ -20,12 +18,7 @@ from .models import RequestModel
 from ..run import close, run_action
 from .utils import init, save_message
 from ..msg.event import cai_event_to_dataclass
-from ..msg.models.event import (
-    BaseEvent,
-    HeartbeatEvent,
-    BaseMessageEvent,
-    dataclass_to_dict,
-)
+from ..msg.models.event import BaseEvent, BaseMessageEvent, dataclass_to_dict
 
 HTTP = config.http
 WEBHOOK = HTTP.webhook if HTTP else None
