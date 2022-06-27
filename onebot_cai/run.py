@@ -278,15 +278,19 @@ def get_supported_actions(echo: str):
 
 async def run_action(action: str, **kwargs) -> SuccessRequest:
     """执行动作"""
-    import onebot_cai.action as action_module
+    from . import action as action_module
 
     echo = kwargs.pop("echo", "")
     try:
         action = action.replace(".", "_")
+        if action.startswith("_"):
+            return FailedInfo(
+                retcode=10002, echo=echo, message=STATUS[10002], data=None
+            )
         if action == "get_supported_actions":
             return get_supported_actions(echo)
         func = getattr(action_module, action, None)
-        if action == "run_action" or not callable(func):
+        if not callable(func):
             return FailedInfo(
                 retcode=10002, echo=echo, message=STATUS[10002], data=None
             )

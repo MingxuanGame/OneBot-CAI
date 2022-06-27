@@ -145,7 +145,7 @@ async def get_group_member_list(echo: str, **kwargs):
     return OKInfo(data=members, echo=echo)  # type: ignore
 
 
-async def send_group_msg(
+async def _send_group_msg(
     client: Client, echo: str, group_id: int, message: Message
 ):
     """发送群消息"""
@@ -188,7 +188,7 @@ async def send_group_msg(
         )
 
 
-async def send_private_msg(
+async def _send_private_msg(
     client: Client, echo: str, user_id: int, message: Message
 ):
     result = await cai_send_private_msg(client, user_id, message)
@@ -250,13 +250,13 @@ async def send_message(client: Client, echo: str, **kwargs):
     if detail_type == "group":
         group_id = _get_int("group_id")
         if isinstance(group_id, int):
-            return await send_group_msg(client, echo, group_id, message)
+            return await _send_group_msg(client, echo, group_id, message)
         else:
             return group_id
     elif detail_type == "private":
         user_id = _get_int("user_id")
         if isinstance(user_id, int):
-            return await send_private_msg(client, echo, user_id, message)
+            return await _send_private_msg(client, echo, user_id, message)
         else:
             return user_id
     return FailedInfo(
@@ -367,7 +367,7 @@ async def qq_ban_group_member(client: Client, echo: str, **kwargs):
     return OKInfo(data=None, echo=echo)
 
 
-async def set_admin(
+async def _set_admin(
     client: Client, echo: str, is_admin: bool, **kwargs
 ) -> SuccessRequest:
     """
@@ -389,7 +389,7 @@ async def qq_set_group_admin(client: Client, echo: str, **kwargs):
     group_id：群号
     user_id：群成员的 QQ 号
     """
-    return await set_admin(client, echo, True, **kwargs)
+    return await _set_admin(client, echo, True, **kwargs)
 
 
 async def qq_unset_group_admin(client: Client, echo: str, **kwargs):
@@ -399,7 +399,7 @@ async def qq_unset_group_admin(client: Client, echo: str, **kwargs):
     group_id：群号
     user_id：群成员的 QQ 号
     """
-    return await set_admin(client, echo, False, **kwargs)
+    return await _set_admin(client, echo, False, **kwargs)
 
 
 async def upload_file(echo: str, **kwargs):
