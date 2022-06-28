@@ -1,7 +1,7 @@
 """OneBot CAI 入口模块"""
 from .config import config
 from .config.config import ConnectWay
-from .log import LOGGING_CONFIG, logger
+from .log import HypercornLoguruLogger, logger
 
 if __name__ == "__main__":
     logger.info("开始启动 OneBot CAI")
@@ -39,9 +39,16 @@ if __name__ == "__main__":
             port = 0
 
         if app:
-            import uvicorn
+            from hypercorn.run import run
+            from hypercorn.config import Config
 
-            uvicorn.run(
-                app=app, host=host, port=port, log_config=LOGGING_CONFIG
+            hypercorn_config = Config()
+            hypercorn_config.bind = [f"{host}:{port}"]
+            hypercorn_config.application_path = app
+            hypercorn_config.access_log_format = (
+                '%(h)s %(l)s "%(r)s" %(s)s "%(a)s"'
             )
+            hypercorn_config._log = HypercornLoguruLogger(hypercorn_config)
+
+            run(hypercorn_config)
     logger.info("OneBot CAI 已关闭")

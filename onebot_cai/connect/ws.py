@@ -1,4 +1,5 @@
 """OneBot CAI 正向 WebSocket 模块"""
+from os import getpid
 from time import time
 from json import loads
 from uuid import uuid4
@@ -81,6 +82,7 @@ manager = ConnectionManager()
 async def startup():
     global scheduler
 
+    logger.info(f"OneBot CAI 运行于 PID {getpid()}")
     scheduler = await init(push_event=push_event, heartbeat=heartbeat)
 
 
@@ -88,6 +90,7 @@ async def startup():
 async def shutdown():
     global scheduler
 
+    logger.info("OneBot CAI 正在关闭")
     await close(scheduler)
 
 

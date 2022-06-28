@@ -1,4 +1,5 @@
 """OneBot CAI HTTP 与 HTTP Webhook 模块"""
+from os import getpid
 from typing import Union, Callable, Optional
 
 from msgpack import unpackb
@@ -109,6 +110,7 @@ async def push_event(client: Client, event: Event):
 async def startup():
     global scheduler
 
+    logger.info(f"OneBot CAI 运行于 PID {getpid()}")
     scheduler = await init(push_event=push_event)
 
 
@@ -116,6 +118,7 @@ async def startup():
 async def shutdown():
     global scheduler
 
+    logger.info("OneBot CAI 正在关闭")
     await close(scheduler)
 
 
