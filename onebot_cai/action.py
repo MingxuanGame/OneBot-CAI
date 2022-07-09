@@ -323,7 +323,7 @@ async def qq_get_message(echo: str, **kwargs):
             retcode=10003, echo=echo, message=STATUS[10003], data=None
         )
     if message := database.get_message(message_id):
-        return OKInfo(data=message, echo=echo)
+        return OKInfo(data=message.msg, echo=echo)
     else:
         return FailedInfo(
             retcode=10003, echo=echo, message=STATUS[10003], data=None

@@ -1,7 +1,9 @@
 """OneBot CAI 状态模块"""
-from typing import List, Union, Optional
+from typing import Any, Dict, List, Union, Optional
 
 from pydantic import BaseModel
+
+from ..msg.models.message import Message
 
 STATUS = {
     0: "",  # 当执行成功时，应为空字符串
@@ -46,13 +48,22 @@ ERROR_HTTP_REQUEST_MESSAGE = {
 参考 https://12.onebot.dev/connect/communication/http/#_3
 """
 
+ModelData = Union[
+    List[BaseModel],
+    Message,  # 消息
+    BaseModel,  # 返回数据
+    Dict[str, Any],  # API 错误调用等
+    List[str],  # get_supported_actions
+    None,  # 无数据返回
+]
+
 
 class SuccessRequest(BaseModel):
     """成功请求"""
 
     status: str
     retcode: int
-    data: Union[dict, List[BaseModel], List[str], BaseModel, None]
+    data: ModelData
     echo: Optional[str] = None
     message: str
 
