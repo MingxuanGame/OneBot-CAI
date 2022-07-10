@@ -2,7 +2,6 @@
 import signal
 import asyncio
 import contextlib
-from os import getpid
 from time import time
 from uuid import uuid4
 from json import dumps, loads
@@ -183,7 +182,6 @@ async def run():
     """运行入口"""
     global scheduler
 
-    logger.info(f"OneBot CAI 运行于 PID {getpid()}")
     scheduler = await init(push_event=push_event, heartbeat=heartbeat)
     task = asyncio.create_task(websocket_client.run(config.account.uin))
     await asyncio.gather(task)

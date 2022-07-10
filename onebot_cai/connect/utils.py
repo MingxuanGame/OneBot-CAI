@@ -1,5 +1,4 @@
 """OneBot CAI 连接通用模块"""
-from asyncio import get_event_loop
 from typing import Any, Callable, Optional
 
 from msgpack import packb
@@ -11,11 +10,11 @@ from fastapi.responses import Response, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from ..log import logger
 from ..config import config
-from ..run import run_action
 from .models import RequestModel
-from ..run import init as cai_init
 from ..utils.database import database
+from ..run import get_client, run_action
 from ..msg.models.message import DatabaseMessage
 from .status import (
     STATUS,
@@ -53,9 +52,10 @@ async def init(
     push_event: Callable, heartbeat: Optional[Callable] = None
 ) -> Optional[AsyncIOScheduler]:
     """初始化 QQ 会话和心跳"""
-    loop = get_event_loop()
-    uin = config.account.uin
-    loop.create_task(cai_init(uin, config.account.password, push_event))
+    client = get_client()
+    if client:
+        logger.debug(f"注册事件监听：{push_event}")
+        client.add_event_listener(push_event)
 
     if heartbeat and (heartbeat_config := config.heartbeat):
         if heartbeat_config.enabled:
@@ -68,7 +68,7 @@ async def init(
                 "cron",
                 name="heartbeat",
                 second=f"*/{int(interval / 1000)}",
-                args=[uin, interval],
+                args=[config.account.uin, interval],
                 timezone=config.universal.timezone,
             )
             scheduler.start()

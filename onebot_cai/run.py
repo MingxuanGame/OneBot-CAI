@@ -2,7 +2,7 @@
 import contextlib
 from time import time
 from random import randint
-from typing import List, Tuple, Union, Callable, Optional
+from typing import List, Tuple, Union, Optional
 
 from cai.api.client import Client
 from cai.client.status_service import OnlineStatus
@@ -32,7 +32,7 @@ from .msg.models.others import (
 client: Optional[Client] = None
 
 
-async def init(account: int, password: str, push_event: Callable):
+async def init(account: int, password: str) -> bool:
     """
     初始化 OneBot CAI
     """
@@ -42,11 +42,10 @@ async def init(account: int, password: str, push_event: Callable):
     status = config.account.status or OnlineStatus.Online
     logger.info(f"使用协议：{protocol.name}")
     client, status = await login(account, password, protocol.name, status)
-    if status:
-        logger.debug(f"注册事件监听：{push_event}")
-        client.add_event_listener(push_event)
-    else:
-        await close(None, True)
+    if not status:
+        return False
+        # await close(None, True)
+    return True
 
 
 def get_status(_client: Client) -> StatusInfo:
@@ -332,17 +331,9 @@ async def set_admin(
     await _client.set_group_admin(group_id, user_id, is_admin)
 
 
-async def close(scheduler: Optional[AsyncIOScheduler], is_fatal: bool = False):
+async def close(scheduler: Optional[AsyncIOScheduler]):
     """关闭心跳服务和 QQ 会话"""
-    global client
 
-    database.close()
     if scheduler:
         logger.debug("关闭心跳服务")
         scheduler.shutdown()
-    if client:
-        logger.debug("关闭 QQ 会话")
-        await client.close()
-        client = None
-    if is_fatal:
-        logger.warning("登录未能成功，请使用 CTRL + C 关闭后重启尝试登录")
