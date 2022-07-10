@@ -33,12 +33,15 @@ SECRET = config.universal.access_token
 
 
 # https://code.luasoftware.com/tutorials/python/asyncio-graceful-shutdown/
-class Sleep:
+class TaskManager:
     def __init__(self):
         self.tasks = set()
 
     async def sleep(self, delay, result=None):
-        task = asyncio.create_task(asyncio.sleep(delay, result))
+        await self.task(asyncio.sleep, None, delay)
+
+    async def task(self, func, result=None, *args, **kwargs):
+        task = asyncio.create_task(func(*args, **kwargs))
         self.tasks.add(task)
         try:
             return await task
@@ -53,7 +56,7 @@ class Sleep:
         # self.tasks = set()
 
 
-sleep = Sleep()
+task_manager = TaskManager()
 
 
 class WebSocketClient:
@@ -61,8 +64,9 @@ class WebSocketClient:
         """初始化反向 WebSocket 客户端"""
         self.address = address
         self._event_queues = set()
-        self.is_close = []
+        self.is_close = False
         self.interval = interval
+        self.tasks = []
 
     async def run(self, bot_id: int):
         """运行反向 WebSocket 服务"""
@@ -81,10 +85,8 @@ class WebSocketClient:
                     logger.success(f"成功连接反向 WebSocket 服务器：" f"{self.address}")
                     try:
 
-                        async def receive(is_closed: list):
+                        async def receive():
                             while True:
-                                if is_closed:
-                                    raise RunComplete
                                 recv = await websocket.recv()
                                 is_json = isinstance(recv, str)
                                 data = (
@@ -98,19 +100,19 @@ class WebSocketClient:
                                 )
                                 await websocket.send(resp)  # type: ignore
 
-                        async def send(is_closed: list):
+                        async def send():
                             while True:
-                                if is_closed:
-                                    raise RunComplete
                                 event = await event_queue.get()
                                 logger.debug(f"向反向 WebSocket 服务器推送事件：{event}")
                                 await websocket.send(dumps(event))
 
-                        await asyncio.gather(
-                            send(self.is_close),
-                            receive(self.is_close),
-                            return_exceptions=False,
-                        )
+                        async def gather():
+                            await asyncio.gather(send(), receive())
+
+                        await task_manager.task(gather, None)
+                        # loop = asyncio.get_event_loop()
+                        # for i in (send(), receive()):
+                        #     self.tasks.append(loop.create_task(i))
                     except ConnectionClosed as e:
                         logger.warning(
                             f"反向 WebSocket 连接断开：{str(e)}，将于"
@@ -129,12 +131,14 @@ class WebSocketClient:
                     f"{self.interval}毫秒后重连"
                 )
             if not self.is_close:
-                await sleep.sleep(self.interval / 1000)
+                await task_manager.sleep(self.interval / 1000)
         # close
         await self.close()
 
-    @staticmethod
-    async def close():
+    async def close(self):
+        for task in self.tasks:
+            if not task.done():
+                task.cancel()
         """关闭心跳和 QQ 服务"""
         await close(scheduler)
 
@@ -191,8 +195,8 @@ def shutdown(sig, frame):
     """关闭 OneBot CAI 入口"""
     logger.debug(f"收到停止信号：{sig}")
     logger.info("OneBot CAI 正在关闭")
-    websocket_client.is_close.append(1)
-    sleep.cancel_all()
+    websocket_client.is_close = True
+    task_manager.cancel_all()
 
 
 signs = {
