@@ -17,7 +17,7 @@ from ..const import make_header
 from .models import RequestModel
 from ..run import close, run_action
 from ..msg.event import cai_event_to_dataclass
-from ..msg.models.event import BaseEvent, BaseMessageEvent, dataclass_to_dict
+from ..models.event import BaseEvent, BaseMessageEvent, dataclass_to_dict
 from .utils import (
     MsgpackResponse,
     init,

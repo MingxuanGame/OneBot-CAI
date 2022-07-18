@@ -35,7 +35,7 @@ from cai.client.events.group import (
 
 from ..log import logger
 from .message import get_alt_message, get_message_element
-from .models.event import (
+from ..models.event import (
     LUCKY_CHARACTER_OPERATE,
     BaseEvent,
     GroupAdminSet,

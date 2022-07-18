@@ -15,17 +15,17 @@ from ..config import config
 from .models import RequestModel
 from ..utils.database import database
 from ..run import get_client, run_action
-from ..msg.models.message import DatabaseMessage
+from ..models.message import DatabaseMessage
+from ..models.event import (
+    BaseMessageEvent,
+    GroupMessageEvent,
+    PrivateMessageEvent,
+)
 from .status import (
     STATUS,
     ERROR_HTTP_REQUEST_MESSAGE,
     FailedInfo,
     SuccessRequest,
-)
-from ..msg.models.event import (
-    BaseMessageEvent,
-    GroupMessageEvent,
-    PrivateMessageEvent,
 )
 
 SECRET = config.universal.access_token

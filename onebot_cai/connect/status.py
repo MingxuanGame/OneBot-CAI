@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Union, Optional
 
 from pydantic import BaseModel
 
-from ..msg.models.message import Message
+from ..models.message import Message
 
 STATUS = {
     0: "",  # 当执行成功时，应为空字符串
@@ -51,8 +51,8 @@ ERROR_HTTP_REQUEST_MESSAGE = {
 ModelData = Union[
     List[BaseModel],
     Message,  # 消息
-    BaseModel,  # 返回数据
     Dict[str, Any],  # API 错误调用等
+    BaseModel,  # 返回数据
     List[str],  # get_supported_actions
     None,  # 无数据返回
 ]

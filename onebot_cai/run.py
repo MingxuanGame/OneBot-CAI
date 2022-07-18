@@ -5,6 +5,7 @@ from random import randint
 from typing import List, Tuple, Union, Optional
 
 from cai.api.client import Client
+from pydantic import ValidationError
 from cai.client.status_service import OnlineStatus
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from cai.api.error import (
@@ -18,16 +19,12 @@ from .log import logger
 from .login import login
 from .config import config
 from .const import Protocol
+from .exception import ParamNotFound
 from .utils.database import database
 from .msg.message import get_base_element
-from .msg.models.message import Message, DatabaseMessage
+from .models.message import Message, DatabaseMessage
 from .connect.status import STATUS, OKInfo, FailedInfo, SuccessRequest
-from .msg.models.others import (
-    GroupInfo,
-    FriendInfo,
-    StatusInfo,
-    GroupMemberInfo,
-)
+from .models.others import GroupInfo, FriendInfo, StatusInfo, GroupMemberInfo
 
 client: Optional[Client] = None
 
@@ -294,19 +291,27 @@ async def run_action(action: str, **kwargs) -> SuccessRequest:
                 retcode=10002, echo=echo, message=STATUS[10002], data=None
             )
         need_params = func.__annotations__.keys()
-        if len(need_params) == 1 or "client" not in need_params:
-            return await func(echo, **kwargs)
-        client = get_client()
-        return (
-            await func(client, echo, **kwargs)
-            if client
-            else FailedInfo(
-                retcode=34099,
-                echo=echo,
-                message=STATUS[34099],
-                data=None,
+        try:
+            if len(need_params) == 1 or "client" not in need_params:
+                return await func(echo, **kwargs)
+            client = get_client()
+            return (
+                await func(client, echo, **kwargs)
+                if client
+                else FailedInfo(
+                    retcode=34099,
+                    echo=echo,
+                    message=STATUS[34099],
+                    data=None,
+                )
             )
-        )
+        except (ValidationError, ParamNotFound) as e:
+            return FailedInfo(
+                retcode=10003,
+                echo=echo,
+                message=STATUS[10003],
+                data={"reason": str(e)},
+            )
     except Exception as e:
         logger.exception("执行动作时出现未知错误")
         return FailedInfo(

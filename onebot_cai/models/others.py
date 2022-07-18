@@ -53,7 +53,7 @@ class File(BaseModel):
     type: Literal["url", "path", "data"]
     url: Optional[str] = None
     headers: Optional[dict] = None
-    path: Optional[Union[Path, str]] = None
+    path: Optional[Path] = None
     data: Optional[bytes] = None
     sha256: Optional[str] = None
 

@@ -20,13 +20,13 @@ from cai.client.message_service.models import (
 )
 
 from ..log import logger
-from .models import message
-from .models.others import File
+from ..models import message
+from ..models.others import File
 from ..exception import SegmentParseError
 from ..utils.runtime import seq_to_database_id
 from ..connect.exception import HTTPClientError
 from ..utils.media import video_to_mp4, audio_to_silk
-from .models.message import (
+from ..models.message import (
     POKE_NAME,
     Message,
     FaceSegment,

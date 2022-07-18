@@ -1,8 +1,6 @@
 """OneBot CAI 动作执行模块"""
 from time import time
 from uuid import UUID
-from pathlib import Path
-from typing import Union
 from base64 import b64decode
 from binascii import Error as B64Error
 
@@ -12,21 +10,30 @@ from .log import logger
 from .run import get_client
 from .run import mute_member
 from .run import delete_group_msg
+from .exception import ParamNotFound
 from .utils.database import database
-from .utils.runtime import get_all_int
 from .run import get_group_member_info_list
 from .run import set_admin as cai_set_admin
 from .run import get_status as cai_get_status
+from .models.message import Message, DatabaseMessage
 from .run import get_group_info as cai_get_group_info
 from .run import send_group_msg as cai_send_group_msg
-from .msg.models.message import Message, DatabaseMessage
 from .msg.message import dict_to_message, get_alt_message
 from .run import send_private_msg as cai_send_private_msg
 from .const import IMPL, VERSION, PLATFORM, ONEBOT_VERSION
 from .run import get_group_member_info as cai_get_group_member_info
 from .connect.status import STATUS, OKInfo, FailedInfo, SuccessRequest
+from .models.others import File, FileID, SelfInfo, SentMessage, VersionInfo
 from .run import delete_private_msg, get_group_info_list, get_friend_info_list
-from .msg.models.others import File, FileID, SelfInfo, SentMessage, VersionInfo
+from .models.action import (
+    User,
+    Group,
+    GetFile,
+    MessageID,
+    GroupMember,
+    SendMessage,
+    BanGroupMember,
+)
 
 
 async def get_self_info(echo: str):
@@ -64,13 +71,8 @@ async def get_user_info(echo: str, **kwargs):
 
     注意：目前仍只能获取好友信息，陌生人信息暂不支持
     """
-    ints = get_all_int(["user_id"], **kwargs)
-    if not ints:
-        return FailedInfo(
-            retcode=10003, echo=echo, message=STATUS[10003], data=None
-        )
-    no_cache = kwargs.get("no_cache", True)
-    friend = await cai_get_group_info(ints[0], no_cache)
+    data = User(**kwargs)
+    friend = await cai_get_group_info(data.user_id)
     return (
         OKInfo(data=friend, echo=echo)
         if friend
@@ -85,13 +87,8 @@ async def get_group_info(echo: str, **kwargs):
     获取群信息
     https://12.onebot.dev/interface/group/actions/#get_group_info
     """
-    ints = get_all_int(["group_id"], **kwargs)
-    if not ints:
-        return FailedInfo(
-            retcode=10003, echo=echo, message=STATUS[10003], data=None
-        )
-    no_cache = kwargs.get("no_cache", True)
-    group = await cai_get_group_info(ints[0], not no_cache)
+    data = Group(**kwargs)
+    group = await cai_get_group_info(data.group_id)
     return (
         OKInfo(data=group, echo=echo)
         if group
@@ -115,13 +112,8 @@ async def get_group_member_info(echo: str, **kwargs):
     获取群成员信息
     https://12.onebot.dev/interface/group/actions/#get_group_member_info
     """
-    ints = get_all_int(["group_id", "user_id"], **kwargs)
-    if not ints:
-        return FailedInfo(
-            retcode=10003, echo=echo, message=STATUS[10003], data=None
-        )
-    no_cache = kwargs.get("no_cache", True)
-    member = await cai_get_group_member_info(ints[0], ints[1], not no_cache)
+    data = GroupMember(**kwargs)
+    member = await cai_get_group_member_info(data.group_id, data.user_id)
     if member:
         return OKInfo(data=member, echo=echo)
     else:
@@ -135,13 +127,8 @@ async def get_group_member_list(echo: str, **kwargs):
     获取群成员列表
     https://12.onebot.dev/interface/group/actions/#get_group_member_list
     """
-    ints = get_all_int(["group_id"], **kwargs)
-    if not ints:
-        return FailedInfo(
-            retcode=10003, echo=echo, message=STATUS[10003], data=None
-        )
-    no_cache = kwargs.get("no_cache", True)
-    members = await get_group_member_info_list(ints[0], not no_cache)
+    data = Group(**kwargs)
+    members = await get_group_member_info_list(data.group_id)
     return OKInfo(data=members, echo=echo)  # type: ignore
 
 
@@ -226,20 +213,10 @@ async def send_message(client: Client, echo: str, **kwargs):
     https://12.onebot.dev/interface/message/actions/#send_message
     """
 
-    def _get_int(except_: str) -> Union[int, FailedInfo]:
-        ints = get_all_int([except_], **kwargs)
-        if not ints:
-            return FailedInfo(
-                retcode=10003, echo=echo, message=STATUS[10003], data=None
-            )
-        return ints[0]
+    data = SendMessage(**kwargs)
 
-    raw_message: list = kwargs.get("message", None)
-    detail_type = kwargs.get("detail_type", None)
-    if not detail_type or not raw_message:
-        return FailedInfo(
-            retcode=10003, echo=echo, message=STATUS[10003], data=None
-        )
+    raw_message = data.message
+    detail_type = data.detail_type
     message = []
     for i in raw_message:
         try:
@@ -248,17 +225,17 @@ async def send_message(client: Client, echo: str, **kwargs):
         except ValueError:
             logger.warning("解析消息段失败，可能是格式不符合")
     if detail_type == "group":
-        group_id = _get_int("group_id")
-        if isinstance(group_id, int):
+        group_id = data.group_id
+        if group_id:
             return await _send_group_msg(client, echo, group_id, message)
         else:
-            return group_id
+            raise ParamNotFound("group_id")
     elif detail_type == "private":
-        user_id = _get_int("user_id")
-        if isinstance(user_id, int):
+        user_id = data.user_id
+        if user_id:
             return await _send_private_msg(client, echo, user_id, message)
         else:
-            return user_id
+            raise ParamNotFound("user_id")
     return FailedInfo(
         retcode=10003, echo=echo, message=STATUS[10003], data=None
     )
@@ -270,8 +247,10 @@ async def delete_message(client: Client, echo: str, **kwargs):
     撤回消息
     https://12.onebot.dev/interface/message/actions/#delete_message
     """
+
+    data = MessageID(**kwargs)
     try:
-        msg_id = str(kwargs.get("message_id", None))
+        msg_id = data.message_id
         if msg := database.get_message(msg_id):
             if msg.group and msg.seq and msg.rand:
                 func = delete_group_msg(
@@ -317,16 +296,13 @@ async def qq_get_message(echo: str, **kwargs):
 
     message_id 消息 ID
     """
-    message_id = str(kwargs.get("message_id", None))
-    if not message_id:
-        return FailedInfo(
-            retcode=10003, echo=echo, message=STATUS[10003], data=None
-        )
-    if message := database.get_message(message_id):
+    data = MessageID(**kwargs)
+    msg_id = data.message_id
+    if message := database.get_message(msg_id):
         return OKInfo(data=message.msg, echo=echo)
     else:
         return FailedInfo(
-            retcode=10003, echo=echo, message=STATUS[10003], data=None
+            retcode=31000, echo=echo, message=STATUS[31000], data=None
         )
 
 
@@ -335,8 +311,9 @@ async def get_file(echo: str, **kwargs):
     获取文件
     https://12.onebot.dev/interface/file/actions/#get_file
     """
-    file_id = str(kwargs.get("file_id"))
-    type_ = str(kwargs.get("type", "url"))
+    data = GetFile(**kwargs)
+    file_id = data.file_id
+    type_ = data.type
     file = database.get_file(UUID(file_id))
     if file and file.type == type_:
         return OKInfo(data=file, echo=echo)
@@ -354,16 +331,11 @@ async def qq_ban_group_member(client: Client, echo: str, **kwargs):
     user_id：被禁言群成员的 QQ 号
     duration：禁言时间，单位为秒（默认为 600）
     """
-    ints = get_all_int(["group_id", "user_id"], **kwargs)
-    if not ints:
-        return FailedInfo(
-            retcode=10003, echo=echo, message=STATUS[10003], data=None
-        )
-    try:
-        duration = kwargs.get("duration", 600)
-    except ValueError:
+    data = BanGroupMember(**kwargs)
+    duration = data.duration
+    if not duration:
         duration = 600
-    await mute_member(client, ints[0], ints[1], duration)
+    await mute_member(client, data.group_id, data.user_id, duration)
     return OKInfo(data=None, echo=echo)
 
 
@@ -373,12 +345,8 @@ async def _set_admin(
     """
     群管理员操作
     """
-    ints = get_all_int(["group_id", "user_id"], **kwargs)
-    if not ints:
-        return FailedInfo(
-            retcode=10003, echo=echo, message=STATUS[10003], data=None
-        )
-    await cai_set_admin(client, ints[0], ints[1], is_admin)
+    data = GroupMember(**kwargs)
+    await cai_set_admin(client, data.group_id, data.user_id, is_admin)
     return OKInfo(data=None, echo=echo)
 
 
@@ -407,34 +375,37 @@ async def upload_file(echo: str, **kwargs):
     上传文件
     https://12.onebot.dev/interface/file/actions/#upload_file
     """
-    type_ = str(kwargs.get("type"))
-    if not type_ or type_ not in ["url", "data", "path"]:
-        return FailedInfo(
-            retcode=10003, echo=echo, message=STATUS[10003], data=None
-        )
-    try:
-        name = kwargs["name"]
-        if type_ == "url":
-            url = kwargs["url"]
+    parsed_data = File(**kwargs)
+    type_ = parsed_data.type
+    name = parsed_data.name
+    if type_ == "url":
+        url = parsed_data.url
+        if url:
             file = File(type="url", name=name, url=url)
-        elif type_ == "path":
-            path = Path(kwargs["path"])
-            if not path.is_file():
-                raise
-            file = File(type="path", name=name, path=path)
-        elif type_ == "data":
-            data: Union[str, bytes] = kwargs["data"]
-            if isinstance(data, str):
-                data = b64decode(data)
-            file = File(type="data", name=name, data=data)
-        else:
-            raise RuntimeError
-        id_ = database.save_file(file)
-        return OKInfo(data=FileID(file_id=str(id_)), echo=echo)
-    except (KeyError, RuntimeError, B64Error):
-        return FailedInfo(
-            retcode=10003, echo=echo, message=STATUS[10003], data=None
-        )
+        raise ParamNotFound("url")
+    elif type_ == "path":
+        path = parsed_data.path
+        if not path:
+            raise ParamNotFound("path")
+        if not path.is_file():
+            return FailedInfo(
+                retcode=10003,
+                echo=echo,
+                message=STATUS[10003],
+                data={"reason": "file not found"},
+            )
+        file = File(type="path", name=name, path=path)
+    elif type_ == "data":
+        data = parsed_data.data
+        if data:
+            try:
+                data_ = b64decode(data)
+            except B64Error:
+                data_ = data
+            file = File(type="data", name=name, data=data_)
+        raise ParamNotFound("data")
+    id_ = database.save_file(file)  # type: ignore
+    return OKInfo(data=FileID(file_id=str(id_)), echo=echo)
 
 
 async def get_status(client: Client, echo: str, **kwargs):

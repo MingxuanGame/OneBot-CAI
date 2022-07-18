@@ -6,9 +6,9 @@ from uuid import UUID, uuid4
 from plyvel import DB
 from msgpack import packb, unpackb
 
-from ..msg.models.others import File
+from ..models.others import File
 from .runtime import seq_to_database_id
-from ..msg.models.message import MessageSegment, DatabaseMessage
+from ..models.message import MessageSegment, DatabaseMessage
 
 
 class Database:
@@ -23,10 +23,11 @@ class Database:
 
         data File 对象
         """
+        data_ = data.dict()
         file_id = uuid4()
         if data.path:
-            data.path = str(data.path)
-        data_byte = packb(data.dict(), use_bin_type=True)
+            data_["path"] = str(data.path)
+        data_byte = packb(data_, use_bin_type=True)
         self.db.put(file_id.bytes, data_byte)
         return file_id
 
