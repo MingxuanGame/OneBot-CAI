@@ -1,4 +1,5 @@
 """OneBot CAI 通用异常模块"""
+
 from .models.message import MessageSegment
 
 

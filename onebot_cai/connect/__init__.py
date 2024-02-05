@@ -1,4 +1,5 @@
 """OneBot CAI 连接包"""
+
 __all__ = [
     "utils",
     "status",

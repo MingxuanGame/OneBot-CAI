@@ -1,4 +1,5 @@
 """OneBot CAI 通用模块"""
+
 __all__ = ["database", "media"]
 from .media import (
     pcm_to_silk,

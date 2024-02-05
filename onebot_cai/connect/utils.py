@@ -1,4 +1,5 @@
 """OneBot CAI 连接通用模块"""
+
 from typing import Any, Callable, Optional
 
 from msgpack import packb

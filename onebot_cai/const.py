@@ -1,4 +1,5 @@
 """OneBot CAI 常量模块"""
+
 from enum import IntEnum
 from typing import Optional
 

@@ -1,4 +1,5 @@
 """OneBot CAI 正向 WebSocket 模块"""
+
 from time import time
 from json import loads
 from uuid import uuid4

@@ -1,4 +1,5 @@
 """OneBot CAI 请求模型模块"""
+
 from typing import Optional
 
 from pydantic import BaseModel

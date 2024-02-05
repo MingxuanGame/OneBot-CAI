@@ -1,4 +1,5 @@
 """OneBot CAI 登录模块"""
+
 from typing import Tuple
 from hashlib import md5 as hmd5
 
@@ -34,7 +35,9 @@ async def login_exception(exception: Exception) -> bool:
     elif isinstance(exception, LoginCaptchaNeeded):
         async with aio_open("captcha.png", "wb") as f:
             await f.write(exception.captcha_image)
-        logger.warning("登录失败：需要输入验证码，请打开本地图片 captcha.png 输入验证码")
+        logger.warning(
+            "登录失败：需要输入验证码，请打开本地图片 captcha.png 输入验证码"
+        )
         captcha = input("验证码 >>> ")
         try:
             await client.submit_captcha(captcha, exception.captcha_sign)

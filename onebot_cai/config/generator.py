@@ -1,4 +1,5 @@
 """OneBot CAI 配置生成模块"""
+
 from functools import partial
 from typing import Tuple, Callable, Optional
 
@@ -123,7 +124,9 @@ def create_config():
 
     def _http_config():
         http_host, http_port = _ip_and_port()
-        use_get_latest_events = _to_bool("是否启用 get_latest_events 元动作", False)
+        use_get_latest_events = _to_bool(
+            "是否启用 get_latest_events 元动作", False
+        )
         if use_get_latest_events == "true":
             event_buffer_size = _int_while("事件缓冲区大小")
         else:
@@ -150,12 +153,17 @@ def create_config():
         return host, port
 
     config_list = []
-    print("未找到配置文件，请根据提示输入内容生成配置文件\n" "提示：含有可选的配置项可输入回车跳过")
+    print(
+        "未找到配置文件，请根据提示输入内容生成配置文件\n"
+        "提示：含有可选的配置项可输入回车跳过"
+    )
     uin = _int_while(" QQ 号", 10000)
     password = _not_null("密码")
     access_token = _optional("鉴权密钥", lambda _: _)
     while True:
-        connect_way = _not_null("连接方式（1为HTTP，2为正向WebSocket，" "3为反向WebSocket）")
+        connect_way = _not_null(
+            "连接方式（1为HTTP，2为正向WebSocket，" "3为反向WebSocket）"
+        )
         if connect_way not in ["1", "2", "3"]:
             print("输入无效！请重新输入")
         else:

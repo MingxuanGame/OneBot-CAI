@@ -1,4 +1,5 @@
 """OneBot CAI leveldb 数据库模块"""
+
 from pathlib import Path
 from typing import Optional
 from uuid import UUID, uuid4
