@@ -1,4 +1,5 @@
 """OneBot CAI 反向 WebSocket 模块"""
+
 import signal
 import asyncio
 import contextlib
@@ -82,7 +83,9 @@ class WebSocketClient:
                 async with connect(
                     self.address, extra_headers=headers
                 ) as websocket:
-                    logger.success(f"成功连接反向 WebSocket 服务器：" f"{self.address}")
+                    logger.success(
+                        f"成功连接反向 WebSocket 服务器：" f"{self.address}"
+                    )
                     try:
 
                         async def receive():
@@ -103,7 +106,9 @@ class WebSocketClient:
                         async def send():
                             while True:
                                 event = await event_queue.get()
-                                logger.debug(f"向反向 WebSocket 服务器推送事件：{event}")
+                                logger.debug(
+                                    f"向反向 WebSocket 服务器推送事件：{event}"
+                                )
                                 await websocket.send(dumps(event))
 
                         async def gather():

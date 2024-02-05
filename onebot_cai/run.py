@@ -1,4 +1,5 @@
 """OneBot CAI 通用运行模块"""
+
 import contextlib
 from time import time
 from random import randint

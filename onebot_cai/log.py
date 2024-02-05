@@ -1,4 +1,5 @@
 """OneBot CAI 日志模块"""
+
 import logging
 from sys import stdout
 from typing import TYPE_CHECKING

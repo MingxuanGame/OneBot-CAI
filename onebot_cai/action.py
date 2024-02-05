@@ -1,4 +1,5 @@
 """OneBot CAI 动作执行模块"""
+
 from time import time
 from uuid import UUID
 from base64 import b64decode

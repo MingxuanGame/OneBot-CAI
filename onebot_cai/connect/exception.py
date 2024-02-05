@@ -1,4 +1,5 @@
 """OneBot CAI 请求异常模块"""
+
 from typing import Union, Optional
 
 from pydantic import HttpUrl

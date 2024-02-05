@@ -1,4 +1,5 @@
 """OneBot CAI 消息模块"""
+
 from uuid import UUID
 from io import BytesIO
 from inspect import isclass
@@ -280,7 +281,9 @@ async def get_base_element(
                         continue
                 raise SegmentParseError(i)
         except SegmentParseError as e:
-            logger.warning(f"解析消息段 {e.name} 失败：可能是类型错误或缺少参数")
+            logger.warning(
+                f"解析消息段 {e.name} 失败：可能是类型错误或缺少参数"
+            )
     if messages_:
         return messages_
 

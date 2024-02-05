@@ -2,6 +2,7 @@
 OneBot CAI 媒体转换模块
 本模块需要 FFmpeg！
 """
+
 import tempfile
 from io import BytesIO
 from asyncio import sleep

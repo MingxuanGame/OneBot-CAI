@@ -1,4 +1,5 @@
 """OneBot CAI 返回模型模块"""
+
 from pathlib import Path
 from typing import Union, Literal, Optional
 

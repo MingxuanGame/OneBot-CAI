@@ -1,4 +1,5 @@
 """OneBot CAI 事件模型模块"""
+
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import Literal, Optional

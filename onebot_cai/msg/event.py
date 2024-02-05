@@ -1,4 +1,5 @@
 """OneBot CAI 事件模块"""
+
 from time import time
 from uuid import uuid4
 from typing import Union
@@ -66,7 +67,8 @@ async def cai_event_to_dataclass(
             alt_message = await get_alt_message(message)
             user_id = event.from_uin
             logger.debug(
-                f"将 CAI PrivateMessage 转换为 " f"PrivateMessageEvent（seq：{seq}）"
+                f"将 CAI PrivateMessage 转换为 "
+                f"PrivateMessageEvent（seq：{seq}）"
             )
             if len(alt_message) > 15:
                 log_message = alt_message[:15] + "..."
@@ -91,13 +93,16 @@ async def cai_event_to_dataclass(
             user_id = event.from_uin
             alt_message = await get_alt_message(message, group_id=group_id)
             logger.debug(
-                f"将 CAI GroupMessage 转换为 " f"GroupMessageEvent（seq：{seq}）"
+                f"将 CAI GroupMessage 转换为 "
+                f"GroupMessageEvent（seq：{seq}）"
             )
             if len(alt_message) > 15:
                 log_message = alt_message[:15] + "..."
             else:
                 log_message = alt_message
-            logger.info(f"收到群 {group_id} 成员 {user_id} 的消息：{log_message}")
+            logger.info(
+                f"收到群 {group_id} 成员 {user_id} 的消息：{log_message}"
+            )
             return GroupMessageEvent(
                 time=time(),
                 id=str(uuid4()),
@@ -132,8 +137,13 @@ async def cai_event_to_dataclass(
         group_id = event.group_id
         target_id = event.target_id
         operator_id = event.operator_id
-        logger.debug("将 CAI GroupMemberUnMutedEvent 转换为 GroupMemberUnBanEvent")
-        logger.info(f"群 {group_id} 成员 {target_id} " f"被管理员 {operator_id} 解除禁言")
+        logger.debug(
+            "将 CAI GroupMemberUnMutedEvent 转换为 GroupMemberUnBanEvent"
+        )
+        logger.info(
+            f"群 {group_id} 成员 {target_id} "
+            f"被管理员 {operator_id} 解除禁言"
+        )
         return GroupMemberUnBanEvent(
             time=time(),
             id=str(uuid4()),
@@ -143,7 +153,9 @@ async def cai_event_to_dataclass(
             operator_id=operator_id,
         )
     elif isinstance(event, GroupMemberJoinedEvent):
-        logger.debug("将 CAI GroupMemberJoinedEvent 转换为 GroupMemberIncrease")
+        logger.debug(
+            "将 CAI GroupMemberJoinedEvent 转换为 GroupMemberIncrease"
+        )
         user_id = event.uin
         group_id = event.group_id
         logger.info(f"{event.nickname}（{user_id}）加入群 {group_id}")
@@ -198,9 +210,7 @@ async def cai_event_to_dataclass(
             if is_recall:
                 log_info = f"群 {group_id} 成员 {operator_id} 撤回了一条消息"
             else:
-                log_info = (
-                    f"群 {group_id} 管理员 {operator_id} 撤回了成员 {user_id} 的消息"
-                )
+                log_info = f"群 {group_id} 管理员 {operator_id} 撤回了成员 {user_id} 的消息"
             logger.info(log_info)
             onebot_event = GroupMessageDeleteEvent(
                 time=time(),

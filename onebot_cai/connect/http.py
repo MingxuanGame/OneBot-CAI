@@ -1,4 +1,5 @@
 """OneBot CAI HTTP 与 HTTP Webhook 模块"""
+
 from typing import Union, Callable, Optional
 
 from msgpack import unpackb

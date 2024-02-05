@@ -1,6 +1,5 @@
 """OneBot CAI 命令行入口模块"""
 
-
 if __name__ == "__main__":
     from sys import exit as sys_exit
     from asyncio import get_event_loop

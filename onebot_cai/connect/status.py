@@ -1,4 +1,5 @@
 """OneBot CAI 状态模块"""
+
 from typing import Any, Dict, List, Union, Optional
 
 from pydantic import BaseModel
